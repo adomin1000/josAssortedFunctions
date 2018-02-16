@@ -151,7 +151,7 @@ if(!$existingMigration){
         $reportFilePath = Join-Path $Env:Temp -childPath "pfToO365GroupsMigrationStatus.csv"
         #loop over all public folders
         $stats = get-publicfolderstatistics -ResultSize Unlimited | sort-object -Property FolderPath
-        ac $reportFilePath "topLevelFolder,folderPath,size,itemCount,contactCount,targetGroup,migrationStatus,errorCount,itemsMigrated,dataMigrated"
+        ac $reportFilePath "topLevelFolder,folderPath,size,itemCount,contactCount,targetGroup,migrationStatus,errorCount,itemsMigrated,dataMigrated" -Encoding UTF8
         $currentCount = 0
         $totalSize = 0
         $resettableSize = 0
@@ -177,10 +177,10 @@ if(!$existingMigration){
                 write-host "$($O365GroupBaseName)$($nameIndex)@$($tenantDomain)"
             }
             try{
-                ac $reportFilePath "`"$topLevelFolderName`",`"$($folder.FolderPath.Trim())`",$($thisFolderSize/1024/1024),$($folder.itemCount),$($folder.contactCount),`"$($O365GroupBaseName)$($nameIndex)@$($tenantDomain)`",`"PENDING`",0,0,0" -ErrorAction Stop
+                ac $reportFilePath "`"$topLevelFolderName`",`"$($folder.FolderPath.Trim())`",$($thisFolderSize/1024/1024),$($folder.itemCount),$($folder.contactCount),`"$($O365GroupBaseName)$($nameIndex)@$($tenantDomain)`",`"PENDING`",0,0,0" -ErrorAction Stop -Encoding UTF8
             }catch{
                 sleep -s 2
-                ac $reportFilePath "`"$topLevelFolderName`",`"$($folder.FolderPath.Trim())`",$($thisFolderSize/1024/1024),$($folder.itemCount),$($folder.contactCount),`"$($O365GroupBaseName)$($nameIndex)@$($tenantDomain)`",`"PENDING`",0,0,0"
+                ac $reportFilePath "`"$topLevelFolderName`",`"$($folder.FolderPath.Trim())`",$($thisFolderSize/1024/1024),$($folder.itemCount),$($folder.contactCount),`"$($O365GroupBaseName)$($nameIndex)@$($tenantDomain)`",`"PENDING`",0,0,0" -Encoding UTF8
             }
 
         }
@@ -270,8 +270,8 @@ $scriptBlock = {
                 #SUBMIT BATCH JOB CODE HERE:
                 try{Remove-Item $tempCSVPath -Force -ErrorAction SilentlyContinue}catch{$Null}
                 try{
-                    Add-Content $tempCSVPath "FolderPath,TargetGroupMailbox" -Force
-                    Add-Content $tempCSVPath "`"\$($folder.FolderPath.Trim())`",$targetGroup" -Force
+                    Add-Content $tempCSVPath "FolderPath,TargetGroupMailbox" -Force -Encoding UTF8
+                    Add-Content $tempCSVPath "`"\$($folder.FolderPath.Trim())`",$targetGroup" -Force -Encoding UTF8
                     $res = New-EXOMigrationBatch -Name "PFToGroupEndpointByScriptMigrationBatch$($folderLoopCounter)" -PublicFolderToUnifiedGroup -CSVData ([System.IO.File]::ReadAllBytes($tempCSVPath)) -SourceEndpoint $PfEndpoint.Identity -BadItemLimit unlimited -autostart
                     write-output "$folderLoopCounter $($folder.folderPath) submitted to group $targetGroup"
                     $mappingData[$folderLoopCounter].migrationStatus = "IN PROGRESS"
@@ -295,14 +295,15 @@ $scriptBlock = {
                     #nice, job done!
                     if($jobStatistics.SyncedItemCount -ge $folder.itemCount){
                         $mappingData[$folderLoopCounter].migrationStatus = "COMPLETED" 
-                        write-output "$folderLoopCounter $targetGroup SUCCEEDED"    
+                        write-output "$folderLoopCounter $targetGroup SUCCEEDED"   
+                        $mappingData[$folderLoopCounter].dataMigrated = $jobStatistics.BytesTransferred 
                     }else{
+                        $mappingData[$folderLoopCounter].dataMigrated = $jobStatistics.ErrorSummary
                         $mappingData[$folderLoopCounter].migrationStatus = "FAILED"
                         write-output "$folderLoopCounter $targetGroup FAILED"
                     }
                     $mappingData[$folderLoopCounter].errorCount = $jobStatistics.SkippedItemCount
                     $mappingData[$folderLoopCounter].itemsMigrated = $jobStatistics.SyncedItemCount
-                    $mappingData[$folderLoopCounter].dataMigrated = $jobStatistics.BytesTransferred
                     #REMOVE BATCH JOB CODE HERE:
                     try{
                         $res = Remove-EXOMigrationBatch -Identity "PFToGroupEndpointByScriptMigrationBatch$($folderLoopCounter)" -Confirm:$False
@@ -319,10 +320,10 @@ $scriptBlock = {
         }    
     }
     try{
-        $mappingData | Export-CSV -Path $reportFilePath -Force -Delimiter "," -NoTypeInformation -ErrorAction Stop
+        $mappingData | Export-CSV -Path $reportFilePath -Force -Delimiter "," -NoTypeInformation -Encoding UTF8 -ErrorAction Stop
     }catch{
         sleep -s 1
-        $mappingData | Export-CSV -Path $reportFilePath -Force -Delimiter "," -NoTypeInformation -ErrorAction Stop
+        $mappingData | Export-CSV -Path $reportFilePath -Force -Delimiter "," -NoTypeInformation -Encoding UTF8 -ErrorAction Stop
     }
     Get-PSSession | Remove-PSSession -Confirm:$False
 }

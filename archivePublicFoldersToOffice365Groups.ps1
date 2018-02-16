@@ -218,7 +218,6 @@ if(!$existingMigration){
 }
 
 Write-Progress -Activity "Archiving Public Folders" -CurrentOperation "Preparing batches" -Status "...." -PercentComplete 0
-$PfEndpoint = Get-EXOMigrationEndpoint | where {$_.Identity -eq "PFToGroupEndpointByScript" -and $_}
 $currentJobId = $Null
 
 $scriptBlock = {
@@ -328,7 +327,7 @@ $scriptBlock = {
     Get-PSSession | Remove-PSSession -Confirm:$False
 }
 Write-Progress -Activity "Archiving Public Folders" -Status "Submitting first job before checking overall state" -CurrentOperation "..." -PercentComplete 0
-$currentJobId = (Start-Job -Name "pfMigrationJob" -ScriptBlock $scriptBlock -ArgumentList $reportFilePath, $o365Creds, $PfEndpoint, $temporaryModulePath).Id
+$currentJobId = (Start-Job -Name "pfMigrationJob" -ScriptBlock $scriptBlock -ArgumentList $reportFilePath, $o365Creds, $temporaryModulePath).Id
 while($true){
     if($currentJobId -ne $Null){
         $currentJob = Get-Job -Id $currentJobId
@@ -346,7 +345,7 @@ while($true){
                 try{$percentFailed = (($failedJobCount/$totalJobCount))*100}catch{$percentFailed = 0}
                 try{$percentSucceeded = (($succeededJobCount/$totalJobCount))*100}catch{$percentSucceeded = 0}
                 Write-Progress -Activity "Archiving Public Folders" -Status "Uploading data, $([math]::Round($percentComplete,2))% done" -CurrentOperation "Remaining folders: $pendingJobCount/$totalJobCount  |  $failedJobCount failed ($([math]::Round($percentFailed,2))%)  |  $succeededJobCount succeeded ($([math]::Round($percentSucceeded,2))%)" -PercentComplete $percentComplete
-                $currentJobId = (Start-Job -Name "pfMigrationJob" -ScriptBlock $scriptBlock -ArgumentList $reportFilePath, $o365Creds, $PfEndpoint, $temporaryModulePath).Id
+                $currentJobId = (Start-Job -Name "pfMigrationJob" -ScriptBlock $scriptBlock -ArgumentList $reportFilePath, $o365Creds, $temporaryModulePath).Id
             }else{
                 Write-Host "Error in job?" -ForegroundColor Red
                 Receive-Job -Id $currentJobId

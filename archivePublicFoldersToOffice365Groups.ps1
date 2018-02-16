@@ -218,7 +218,7 @@ if(!$existingMigration){
 }
 
 Write-Progress -Activity "Archiving Public Folders" -CurrentOperation "Preparing batches" -Status "...." -PercentComplete 0
-
+$PfEndpoint = Get-EXOMigrationEndpoint | where {$_.Identity -eq "PFToGroupEndpointByScript" -and $_}
 $currentJobId = $Null
 
 $scriptBlock = {

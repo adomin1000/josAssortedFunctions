@@ -238,7 +238,6 @@ $scriptBlock = {
         $o365GroupNames += $group.targetGroup    
     }
     $ErrorActionPreference = "Stop"
-    $mappingData = Import-CSV -Delimiter "," -Path $reportFilePath
     $totalFolders = $mappingData.Count
     $groupLoopCounter = -1
     foreach($targetGroup in $o365GroupNames){
@@ -291,7 +290,7 @@ $scriptBlock = {
                 }
                 #Update CSV and remove batch job once status is completed
                 if($jobStatistics.PercentageComplete -eq 100 -or $jobStatistics.Status -like "Failed"){
-                    #nice, job done!
+                    #job done!
                     if($jobStatistics.SyncedItemCount -ge $folder.itemCount){
                         $mappingData[$folderLoopCounter].migrationStatus = "COMPLETED" 
                         write-output "$folderLoopCounter $targetGroup SUCCEEDED"   
@@ -303,12 +302,13 @@ $scriptBlock = {
                     }
                     $mappingData[$folderLoopCounter].errorCount = $jobStatistics.SkippedItemCount
                     $mappingData[$folderLoopCounter].itemsMigrated = $jobStatistics.SyncedItemCount
-                    #REMOVE BATCH JOB CODE HERE:
+                    #REMOVE BATCH JOB:
                     try{
                         $res = Remove-EXOMigrationBatch -Identity "PFToGroupEndpointByScriptMigrationBatch$($folderLoopCounter)" -Confirm:$False
                         continue
                     }catch{
-                        $mappingData[$folderLoopCounter].migrationStatus = "PENDING"
+                        Sleep -s 30
+                        $res = Remove-EXOMigrationBatch -Identity "PFToGroupEndpointByScriptMigrationBatch$($folderLoopCounter)" -Confirm:$False
                     }
                 }else{
                     write-output "$folderLoopCounter $targetGroup in progress at $($jobStatistics.PercentageComplete) %"

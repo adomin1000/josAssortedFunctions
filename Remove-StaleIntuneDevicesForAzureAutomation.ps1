@@ -23,8 +23,8 @@ Original authors: Sarah L Handler and Josh Douglas
 
 Param(
     [Parameter(Mandatory=$true)]$automationAccountCredentialName,
-    $cutoffDays=90,
-    $testMode=0 #set to 1 to run in read-only mode
+    [Int]$cutoffDays=90,
+    [Int]$testMode=0 #set to 1 to run in read-only mode
 )
 
 function Get-AuthToken {
@@ -166,7 +166,7 @@ Function Get-StaleManagedDevices(){
     [cmdletbinding()]
     param
     (
-        $cutoffDays
+        [Int]$cutoffDays
     )
     #change cutoffDays to negative number if non-negative was supplied
     if($cutoffDays -ge 0){

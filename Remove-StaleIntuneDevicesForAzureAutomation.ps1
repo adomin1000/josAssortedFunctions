@@ -110,7 +110,7 @@ function Get-AuthToken {
         $userCredentials = new-object Microsoft.IdentityModel.Clients.ActiveDirectory.UserPasswordCredential -ArgumentList $userUpn,$Password
 
         $authResult = [Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContextIntegratedAuthExtensions]::AcquireTokenAsync($authContext, $resourceAppIdURI, $clientid, $userCredentials);
-        if($authResult.Exception.ToString() -like "*Send an interactive authorization request*"){
+        if($authResult.Exception -and $authResult.Exception.ToString() -like "*Send an interactive authorization request*"){
             try{
                 #Intune Powershell has not yet been authorized, let's try to do this on the fly;
                 login-azurermaccount -Credential $intuneAdminCreds

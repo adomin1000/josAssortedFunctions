@@ -15,7 +15,9 @@
     $apiToken = Invoke-RestMethod "https://login.windows.net/$tenantId/oauth2/token" -Method POST -Body $body -ContentType 'application/x-www-form-urlencoded'
     $header = @{
     'Authorization' = 'Bearer ' + $apiToken.access_token
-    'Content-Type' = 'application/json'}
+    'X-Requested-With'= 'XMLHttpRequest'
+    'x-ms-client-request-id'= [guid]::NewGuid()
+    'x-ms-correlation-id' = [guid]::NewGuid()}
     $url = "https://main.iam.ad.ext.azure.com/api/RegisteredApplications/$azureAppId/Consent?onBehalfOfAll=true"
     Invoke-RestMethod –Uri $url –Headers $header –Method POST -ErrorAction Stop
 }

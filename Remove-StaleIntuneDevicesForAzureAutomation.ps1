@@ -119,10 +119,11 @@ function Get-AuthToken {
                 $refreshToken = $context.TokenCache.ReadItems().RefreshToken
                 $body = "grant_type=refresh_token&refresh_token=$($refreshToken)&resource=74658136-14ec-4630-ad9b-26e160ff0fc6"
                 $apiToken = Invoke-RestMethod "https://login.windows.net/$tenantId/oauth2/token" -Method POST -Body $body -ContentType 'application/x-www-form-urlencoded'
-
                 $header = @{
                 'Authorization' = 'Bearer ' + $apiToken.access_token
-                'Content-Type' = 'application/json'}
+                'X-Requested-With'= 'XMLHttpRequest'
+                'x-ms-client-request-id'= [guid]::NewGuid()
+                'x-ms-correlation-id' = [guid]::NewGuid()}
                 $url = "https://main.iam.ad.ext.azure.com/api/RegisteredApplications/d1ddf0e4-d672-4dae-b554-9d5bdfd93547/Consent?onBehalfOfAll=true" #this is the Microsoft Intune Powershell app ID managed by Microsoft
                 Invoke-RestMethod –Uri $url –Headers $header –Method POST -ErrorAction Stop
                 $authResult = [Microsoft.IdentityModel.Clients.ActiveDirectory.AuthenticationContextIntegratedAuthExtensions]::AcquireTokenAsync($authContext, $resourceAppIdURI, $clientid, $userCredentials);

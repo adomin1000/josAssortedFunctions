@@ -291,14 +291,14 @@ $scriptBlock = {
                 #Update CSV and remove batch job once status is completed
                 if($jobStatistics.PercentageComplete -eq 100 -or $jobStatistics.Status -like "Failed"){
                     #job done!
-                    if($jobStatistics.SyncedItemCount -ge $folder.itemCount){
-                        $mappingData[$folderLoopCounter].migrationStatus = "COMPLETED" 
-                        write-output "$folderLoopCounter $targetGroup SUCCEEDED"   
-                        $mappingData[$folderLoopCounter].dataMigrated = $jobStatistics.BytesTransferred 
-                    }else{
+                    if($jobStatistics.Status -like "Failed"){
                         $mappingData[$folderLoopCounter].dataMigrated = $jobStatistics.ErrorSummary
                         $mappingData[$folderLoopCounter].migrationStatus = "FAILED"
                         write-output "$folderLoopCounter $targetGroup FAILED"
+                    }else{
+                        $mappingData[$folderLoopCounter].migrationStatus = "COMPLETED" 
+                        write-output "$folderLoopCounter $targetGroup SUCCEEDED"   
+                        $mappingData[$folderLoopCounter].dataMigrated = $jobStatistics.BytesTransferred 
                     }
                     $mappingData[$folderLoopCounter].errorCount = $jobStatistics.SkippedItemCount
                     $mappingData[$folderLoopCounter].itemsMigrated = $jobStatistics.SyncedItemCount
@@ -308,7 +308,9 @@ $scriptBlock = {
                         continue
                     }catch{
                         Sleep -s 30
-                        $res = Remove-EXOMigrationBatch -Identity "PFToGroupEndpointByScriptMigrationBatch$($folderLoopCounter)" -Confirm:$False
+                        try{
+                            $res = Remove-EXOMigrationBatch -Identity "PFToGroupEndpointByScriptMigrationBatch$($folderLoopCounter)" -Confirm:$False
+                        }catch{$Null}
                     }
                 }else{
                     write-output "$folderLoopCounter $targetGroup in progress at $($jobStatistics.PercentageComplete) %"

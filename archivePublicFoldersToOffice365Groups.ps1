@@ -347,6 +347,17 @@ while($true){
                 try{$percentFailed = (($failedJobCount/$totalJobCount))*100}catch{$percentFailed = 0}
                 try{$percentSucceeded = (($succeededJobCount/$totalJobCount))*100}catch{$percentSucceeded = 0}
                 Write-Progress -Activity "Archiving Public Folders" -Status "Uploading data, $([math]::Round($percentComplete,2))% done" -CurrentOperation "Remaining folders: $pendingJobCount/$totalJobCount  |  $failedJobCount failed ($([math]::Round($percentFailed,2))%)  |  $succeededJobCount succeeded ($([math]::Round($percentSucceeded,2))%)" -PercentComplete $percentComplete
+                $o365UniqueGroupNames = $mappingData | select-object -unique -Property targetGroup
+                foreach($group in $o365UniqueGroupNames){
+                    $failedJobCount = @($mappingData | where-object {$_.migrationStatus -eq "FAILED" -and $_.targetGroup -eq $group}).Count
+                    $succeededJobCount = @($mappingData | where-object {$_.migrationStatus -eq "COMPLETED" -and $_.targetGroup -eq $group}).Count
+                    $pendingJobCount = @($mappingData | where-object {$_.migrationStatus -eq "PENDING" -and $_.targetGroup -eq $group}).Count
+                    $currentJob = @($mappingData | where-object {$_.migrationStatus -eq "IN PROGRESS" -and $_.targetGroup -eq $group})[0]
+                    if($pendingJobCount -gt 0){
+                        try{$percentComplete = (1-($pendingJobCount/$totalJobCount))*100}catch{$percentComplete = 0}
+                        Write-Progress -Activity "$group" -Status "Remaining folders: $pendingJobCount/$totalJobCount | failed folders: $succeededJobCount" -CurrentOperation "$($currentJob.folderPath) ($($currentJob.itemCount) items)" -PercentComplete $percentComplete
+                    }
+                }                
                 $currentJobId = (Start-Job -Name "pfMigrationJob" -ScriptBlock $scriptBlock -ArgumentList $reportFilePath, $o365Creds, $temporaryModulePath).Id
             }else{
                 Write-Host "Error in job?" -ForegroundColor Red

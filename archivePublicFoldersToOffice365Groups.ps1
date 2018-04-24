@@ -27,7 +27,8 @@ Param(
     [Parameter(Mandatory=$true)][String]$desiredO365GroupOwner = "group or user UPN or GUID", #the group or user here will be the ONLY person with access to the new groups created
     [Parameter(Mandatory=$true)][String]$onPremAdminUserName, #User name of on prem public folder admin that Office 365 can use to pull data with
     [ValidateSet(2010,2013,2016)][String]$exchangeVersion, #Version of your Exchange environment 
-    [Parameter(Mandatory=$true)]$reportFilePath #a csv file will be stored here containing all folders and current progress. If a file already exists, the script assumes you're resuming an existing migration and will skip a lot of stuff
+    [Parameter(Mandatory=$true)]$reportFilePath, #a csv file will be stored here containing all folders and current progress. If a file already exists, the script assumes you're resuming an existing migration and will skip a lot of stuff
+    [Switch]$noNewModule
 )
 
 $o365GroupNames = @()
@@ -37,7 +38,7 @@ $PFtoGroupMapping = @()
 $maxGroupMailboxSize = $maxGroupMailboxSize*1024*1024
 $existingMigration = [System.IO.File]::Exists($reportFilePath)
 
-Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Asking for credentials..." -PercentComplete 0
+Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Asking for credentials..." -PercentComplete 0 -Id 1
 if($existingMigration){
     Read-Host "You're resuming a migration, we'll just ask you for an admin login and get you on your way"
 }else{
@@ -47,18 +48,22 @@ if($existingMigration){
 #connect to Exchange Online
 try{
     $o365Creds = Get-Credential -ErrorAction Stop
-    $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $o365Creds -Authentication Basic -AllowRedirection
-    Import-PSSession $Session -AllowClobber -DisableNameChecking
+    if(!$noNewModule){
+        $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $o365Creds -Authentication Basic -AllowRedirection
+        Import-PSSession $Session -AllowClobber -DisableNameChecking
+    }
 }catch{
     Write-Error "Failed to connect to Exchange Online! Check your login + password"
     Write-Error $_ -ErrorAction Stop    
 }
 
-Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Importing EXO module and saving it..." -PercentComplete 0
+Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Importing EXO module and saving it..." -PercentComplete 0 -Id 1
 #export the ExO session
 try{
     $temporaryModulePath = (Join-Path $Env:TEMP -ChildPath "temporaryEXOModule")
-    Export-PSSession -Session $Session -CommandName * -OutputModule $temporaryModulePath -AllowClobber -Force
+    if(!$noNewModule){
+        Export-PSSession -Session $Session -CommandName * -OutputModule $temporaryModulePath -AllowClobber -Force
+    }
     $temporaryModulePath = Join-Path $temporaryModulePath -ChildPath "temporaryEXOModule.psm1"
     Write-Host "Exchange module saved to $temporaryModulePath"
 }catch{
@@ -66,35 +71,39 @@ try{
     Write-Error $_ -ErrorAction Stop    
 }
 
-Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Scanning and rewriting EXO module on the fly, this could take a few minutes..." -PercentComplete 5
+Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Scanning and rewriting EXO module on the fly, this could take a few minutes..." -PercentComplete 5 -Id 1
 try{
-    $newContent = ""
-    $found = $False
-    (Get-Content $temporaryModulePath) | % {
-        if(!$found -and $_.IndexOf("host.UI.PromptForCredential(") -ge 0){
-            $line = "-Credential `$global:o365Creds ``"
-            if($line){
-                $found = $True
+    if(!$noNewModule){
+        $newContent = ""
+        $found = $False
+        (Get-Content $temporaryModulePath) | % {
+            if(!$found -and $_.IndexOf("host.UI.PromptForCredential(") -ge 0){
+                $line = "-Credential `$global:o365Creds ``"
+                if($line){
+                    $found = $True
+                }
             }
+            if($line){
+                $newContent += $line
+                $line=$Null
+            }else{
+                $newContent += $_
+            }
+            $newContent += "`r`n"
         }
-        if($line){
-            $newContent += $line
-            $line=$Null
-        }else{
-            $newContent += $_
-        }
-        $newContent += "`r`n"
+        $newContent | Out-File -FilePath $temporaryModulePath -Force -Confirm:$False -ErrorAction Stop
     }
-    $newContent | Out-File -FilePath $temporaryModulePath -Force -Confirm:$False -ErrorAction Stop
 }catch{
     Write-Error "Failed to rewrite ExO module!"
     Write-Error $_ -ErrorAction Stop  
 }
 
-Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Module rewritten, reloading..." -PercentComplete 10
+Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Module rewritten, reloading..." -PercentComplete 10 -Id 1
 
 try{
-    $Session | Remove-PSSession -Confirm:$False
+    if(!$noNewModule){
+        $Session | Remove-PSSession -Confirm:$False
+    }
     Import-Module -Name $temporaryModulePath -Prefix EXO -DisableNameChecking -WarningAction SilentlyContinue -Force
 }catch{
     Write-Error "Failed to reconnect to ExO!"
@@ -103,7 +112,7 @@ try{
 
 
 if(!$existingMigration){
-    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Connected to Exchange Online..." -PercentComplete 0
+    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Connected to Exchange Online..." -PercentComplete 0 -Id 1
     #Validate that the user supplied as owner of groups to be created, actually exists
     try{
         $mailbox = get-EXOmailbox -identity $desiredO365GroupOwner
@@ -123,22 +132,22 @@ if(!$existingMigration){
         Write-Error $_ -ErrorAction Stop
     }
 
-    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Validated existence of $desiredO365GroupOwner" -PercentComplete 10
+    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Validated existence of $desiredO365GroupOwner" -PercentComplete 10 -Id 1
     $tenantDomain = @(get-EXOAcceptedDomain | Where-Object {$_.Name -Match ".onmicrosoft.com" -and $_.Name -NotMatch "mail.onmicrosoft.com"})[0].Name
-    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Discovered $tenantDomain domain" -PercentComplete 10
+    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Exchange Online checkup" -Status "Discovered $tenantDomain domain" -PercentComplete 10 -Id 1
 
     #add first entry to the group names array
     $o365GroupNames += "$($O365GroupBaseName)$($nameIndex)@$($tenantDomain)"
 
     try{
-        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "Discovering configuration" -PercentComplete 10
+        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "Discovering configuration" -PercentComplete 10 -Id 1
         Read-Host "Please enter the credentials for $onPremAdminUSerName in the following prompt, press any key when ready"
         $onpremCredential = Get-Credential
         if($exchangeVersion -eq 2010){
             $onPremAdminUserLegacyExchangeDN = @(Get-Mailbox $onPremAdminUserName)[0].LegacyExchangeDN
-            Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "Onprem admin DN: $onPremAdminUserLegacyExchangeDN" -PercentComplete 10
+            Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "Onprem admin DN: $onPremAdminUserLegacyExchangeDN" -PercentComplete 10 -Id 1
             $onPremExchangeServerDN = @(Get-ExchangeServer)[0].ExchangeLegacyDN ##NOTE: THIS ASSUMES YOUR FIRST SERVER IS YOUR PUBLIC FOLDER SERVER! Modify if needed
-            Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "Onprem exchange DN: $onPremExchangeServerDN" -PercentComplete 10
+            Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "Onprem exchange DN: $onPremExchangeServerDN" -PercentComplete 10 -Id 1
         }
         $outlookAnywhereHostname = @(Get-OutlookAnywhere)[0].ExternalHostName.HostNameString ##NOTE: THIS ASSUMES YOUR FIRST SERVER IS YOUR OWA SERVER! Modify if needed
     }catch{
@@ -146,7 +155,7 @@ if(!$existingMigration){
     }
 
     try{
-        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "Reading current public folder layout" -PercentComplete 10
+        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "Reading current public folder layout" -PercentComplete 10 -Id 1
 
         $reportFilePath = Join-Path $Env:Temp -childPath "pfToO365GroupsMigrationStatus.csv"
         #loop over all public folders
@@ -161,7 +170,7 @@ if(!$existingMigration){
                 continue
             }
             $currentCount++
-            Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "$currentCount / $($stats.Count) analysing $($folder.FolderPath)" -PercentComplete 10
+            Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Onprem Exchange checkup" -Status "$currentCount / $($stats.Count) analysing $($folder.FolderPath)" -PercentComplete 10 -Id 1
             #check if we are in a top level folder
             if($folder.FolderPath.IndexOf("\") -eq -1){
                 $topLevelFolderName = $folder.FolderPath
@@ -184,7 +193,7 @@ if(!$existingMigration){
             }
 
         }
-        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Sleeping a few seconds to show you the final numbers" -Status "Folders: $totalFolders, Total size: $([math]::Round($totalSize/1024))MB, Required Groups: $($nameIndex+1)" -PercentComplete 30
+        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Sleeping a few seconds to show you the final numbers" -Status "Folders: $totalFolders, Total size: $([math]::Round($totalSize/1024))MB, Required Groups: $($nameIndex+1)" -PercentComplete 30 -Id 1
         sleep -s 10
     }catch{
         Write-Error "Failed to analyze current public folders, make sure you run this in your local Exchange Shell"
@@ -192,18 +201,18 @@ if(!$existingMigration){
     }
 
     #create the required number of O365 Groups
-    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Creating Office 365 groups" -Status "Reading group list" -PercentComplete 30
+    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Creating Office 365 groups" -Status "Reading group list" -PercentComplete 30 -Id 1
     foreach($group in $o365GroupNames){
-        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Creating Office 365 groups" -Status "Creating $group" -PercentComplete 35
+        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Creating Office 365 groups" -Status "Creating $group" -PercentComplete 35 -Id 1
         $createdGroup = New-EXOUnifiedGroup -accesstype Private -alias $group.Split("@")[0] -DisplayName $group.Split("@")[0] -Name $group.Split("@")[0] -Owner $desiredO365GroupOwner
     }
-    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Creating Office 365 groups" -Status "$($o365GroupNames.Count) Groups created" -PercentComplete 40
+    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Creating Office 365 groups" -Status "$($o365GroupNames.Count) Groups created" -PercentComplete 40 -Id 1
 
-    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Checking migration endpoint" -Status "Discovering" -PercentComplete 45
+    Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Checking migration endpoint" -Status "Discovering" -PercentComplete 45 -Id 1
     #Check the endpoint in ExO:
     $PfEndpoint = Get-EXOMigrationEndpoint | where {$_.Identity -eq "PFToGroupEndpointByScript" -and $_}
     if($PfEndpoint.Identity -ne "PFToGroupEndpointByScript"){
-        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Checking migration endpoint" -Status "Does not exist -> Creating" -PercentComplete 50
+        Write-Progress -Activity "Preparing your Public Folders for Archiving to Office 365 Groups" -CurrentOperation "Checking migration endpoint" -Status "Does not exist -> Creating" -PercentComplete 50 -Id 1
         try{
             if($exchangeVersion -eq 2010){
                 $PfEndpoint = New-EXOMigrationEndpoint -PublicFolderToUnifiedGroup -Name PFToGroupEndpointByScript -RPCProxyServer $outlookAnywhereHostname -Credentials $onpremCredential -SourceMailboxLegacyDN $onPremAdminUserLegacyExchangeDN -PublicFolderDatabaseServerLegacyDN $onPremExchangeServerDN -Authentication Basic
@@ -217,9 +226,8 @@ if(!$existingMigration){
     }
 }
 
-Write-Progress -Activity "Archiving Public Folders" -CurrentOperation "Preparing batches" -Status "...." -PercentComplete 0
+Write-Progress -Activity "Archiving Public Folders" -CurrentOperation "Preparing batches" -Status "...." -PercentComplete 0 -Id 1
 $currentJobId = $Null
-
 $scriptBlock = {
     Param(
         $reportFilePath,
@@ -239,9 +247,7 @@ $scriptBlock = {
     }
     $ErrorActionPreference = "Stop"
     $totalFolders = $mappingData.Count
-    $groupLoopCounter = -1
     foreach($targetGroup in $o365GroupNames){
-        $groupLoopCounter++
         $folderLoopCounter = -1
         foreach($folder in $mappingData){
             $folderLoopCounter++
@@ -328,7 +334,8 @@ $scriptBlock = {
     }
     Get-PSSession | Remove-PSSession -Confirm:$False
 }
-Write-Progress -Activity "Archiving Public Folders" -Status "Submitting first job before checking overall state" -CurrentOperation "..." -PercentComplete 0
+Write-Progress -Activity "Archiving Public Folders" -Status "Submitting first job before checking overall state" -CurrentOperation "..." -PercentComplete 0 -Id 1
+$mappingData = Import-CSV -Delimiter "," -Path $reportFilePath
 $o365UniqueGroupNames = $mappingData | select-object -unique -Property targetGroup
 $currentJobId = (Start-Job -Name "pfMigrationJob" -ScriptBlock $scriptBlock -ArgumentList $reportFilePath, $o365Creds, $temporaryModulePath).Id
 while($true){
@@ -350,13 +357,14 @@ while($true){
                 Write-Progress -Activity "Archiving Public Folders" -Status "Uploading data, $([math]::Round($percentComplete,2))% done" -CurrentOperation "Remaining folders: $pendingJobCount/$totalJobCount  |  $failedJobCount failed ($([math]::Round($percentFailed,2))%)  |  $succeededJobCount succeeded ($([math]::Round($percentSucceeded,2))%)" -PercentComplete $percentComplete -Id 1
                 $progressCounts = 2
                 foreach($group in $o365UniqueGroupNames){
-                    $pendingJobCount = @($mappingData | where-object {$_.migrationStatus -eq "PENDING" -and $_.targetGroup -eq $group}).Count
+                    $pendingJobCount = @($mappingData | where-object {$_.migrationStatus -eq "PENDING" -and $_.targetGroup -eq  $($group.targetGroup)}).Count
                     if($pendingJobCount -gt 0){
-                        $failedJobCount = @($mappingData | where-object {$_.migrationStatus -eq "FAILED" -and $_.targetGroup -eq $group}).Count
-                        $succeededJobCount = @($mappingData | where-object {$_.migrationStatus -eq "COMPLETED" -and $_.targetGroup -eq $group}).Count
-                        $currentJob = @($mappingData | where-object {$_.migrationStatus -eq "IN PROGRESS" -and $_.targetGroup -eq $group})[0]
+                        $failedJobCount = @($mappingData | where-object {$_.migrationStatus -eq "FAILED" -and $_.targetGroup -eq  $($group.targetGroup)}).Count
+                        $succeededJobCount = @($mappingData | where-object {$_.migrationStatus -eq "COMPLETED" -and $_.targetGroup -eq  $($group.targetGroup)}).Count
+                        $currentJob = @($mappingData | where-object {$_.migrationStatus -eq "IN PROGRESS" -and $_.targetGroup -eq  $($group.targetGroup)})[0]
+                        $totalJobCount = $pendingJobCount+$failedJobCount+$succeededJobCount
                         try{$percentComplete = (1-($pendingJobCount/$totalJobCount))*100}catch{$percentComplete = 0}
-                        Write-Progress -Activity "$group" -Status "Remaining folders: $pendingJobCount/$totalJobCount | failed folders: $succeededJobCount" -CurrentOperation "$($currentJob.folderPath) ($($currentJob.itemCount) items)" -PercentComplete $percentComplete -ParentId 1 -id $progressCounts
+                        Write-Progress -Activity "-------> $($group.targetGroup)" -Status "$pendingJobCount folders left | failed: $failedJobCount, current: $($currentJob.folderPath) ($($currentJob.itemCount) items)" -PercentComplete $percentComplete -ParentId 1 -id $progressCounts
                         $progressCounts++
                     }
                 }                

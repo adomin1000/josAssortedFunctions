@@ -373,6 +373,8 @@ while($true){
                 Write-Host "Error in job?" -ForegroundColor Red
                 Receive-Job -Id $currentJobId
                 Sleep -s 10
+                $currentJobId = (Start-Job -Name "pfMigrationJob" -ScriptBlock $scriptBlock -ArgumentList $reportFilePath, $o365Creds, $temporaryModulePath).Id
+                Sleep -s 10
             } 
         }else{
             Sleep -s 10

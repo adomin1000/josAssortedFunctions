@@ -5,7 +5,7 @@
 #Purpose:          Configurable drivemapping to server shares with automatic querying for credentials
 
 #REQUIRED CONFIGURATION
-$driveLetter = "U:" #change to desired driveletter
+$driveLetter = "U" #change to desired driveletter (don't use double colon : )
 $path = "\\nlvfs01\dfs-units$\" #change to desired server / share path
 $shortCutTitle = "U-Drive" #this will be the name of the shortcut
 $autosuggestLogin = $True #automatically prefills the login field of the auth popup with the user's O365 email (azure ad join)
@@ -26,6 +26,10 @@ Param(
     `$driveLetter,
     `$sourcePath
 )
+
+`$desiredMapScriptFolder = Join-Path `$Env:LOCALAPPDATA -ChildPath `"Lieben.nu`"
+
+Start-Transcript -Path (Join-Path `$desiredMapScriptFolder -ChildPath `"SMBdriveMapper.log`") -Force
 "
 if($autosuggestLogin){
     $scriptContent+= "
@@ -37,7 +41,9 @@ try{
         `$userId = `$Null
     }
     `$userId = (Get-ItemProperty -Path `$basePath -Name UserName).UserName
+    Write-Output `"Detected user id: `$userId`"
 }catch{
+    Write-Output `"Failed to auto detect user id, will query`" 
     `$Null
 }
 "
@@ -48,23 +54,30 @@ try{
 }
 
 $scriptContent+= "
-`$credentials = Get-Credential -UserName `$userId -Message `"Password required for `$driveLetter`" -ErrorAction Stop
+try{
+    `$credentials = Get-Credential -UserName `$userId -Message `"Password required for `$driveLetter`" -ErrorAction Stop
+    Write-Output `"Credentials entered by user`"
+}catch{
+    Write-Output `"No credentials entered by user`"
+}
 [void] [System.Reflection.Assembly]::LoadWithPartialName(`"System.Drawing`") 
 [void] [System.Reflection.Assembly]::LoadWithPartialName(`"System.Windows.Forms`")
 
 if(!`$credentials){
     `$OUTPUT= [System.Windows.Forms.MessageBox]::Show(`"`$driveLetter will not be available, as you did not enter credentials`", `"`$driveLetter error`" , 0) 
+    Stop-Transcript
     Exit
 }
 
 try{`$del = NET USE `$driveLetter /DELETE /Y 2>&1}catch{`$Null}
 
 try{
-    `$net = new-object -ComObject WScript.Network
-    `$net.MapNetworkDrive(`$driveLetter, `$sourcePath, `$false, `$credentials.UserName, `$credentials.GetNetworkCredential())
+    New-PSDrive -Name `$driveLetter -PSProvider FileSystem -Root `$sourcePath -Credential `$credentials -Persist
 }catch{
     `$OUTPUT= [System.Windows.Forms.MessageBox]::Show(`"Connection failed, technical reason: `$(`$Error[0])`", `"`$driveLetter error`" , 0) 
-}"
+}
+Stop-Transcript
+"
 
 $scriptContent | Out-File $desiredMapScriptPath -Force
 

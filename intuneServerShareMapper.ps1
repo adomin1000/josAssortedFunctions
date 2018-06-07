@@ -27,6 +27,8 @@ Param(
     `$sourcePath
 )
 
+`$driveLetter = `$driveLetter.SubString(0,1)
+
 `$desiredMapScriptFolder = Join-Path `$Env:LOCALAPPDATA -ChildPath `"Lieben.nu`"
 
 Start-Transcript -Path (Join-Path `$desiredMapScriptFolder -ChildPath `"SMBdriveMapper.log`") -Force
@@ -69,7 +71,7 @@ if(!`$credentials){
     Exit
 }
 
-try{`$del = NET USE `$driveLetter /DELETE /Y 2>&1}catch{`$Null}
+try{`Remove-PSDrive -Name `$driveLetter -Force}catch{`$Null}
 
 try{
     New-PSDrive -Name `$driveLetter -PSProvider FileSystem -Root `$sourcePath -Credential `$credentials -Persist
@@ -81,6 +83,7 @@ Stop-Transcript
 
 $scriptContent | Out-File $desiredMapScriptPath -Force
 
+$driveLetter = $driveLetter.SubString(0,1)
 $WshShell = New-Object -comObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut((Join-Path $desiredShortcutLocation -ChildPath "$($shortCutTitle).lnk"))
 $Shortcut.TargetPath = "powershell.exe"

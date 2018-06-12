@@ -5,9 +5,9 @@
 #Purpose:          Configurable drivemapping to server shares with automatic querying for credentials
 
 #REQUIRED CONFIGURATION
-$driveLetter = "U" #change to desired driveletter (don't use double colon : )
-$path = '\\localhost\c$' #change to desired server / share path
-$shortCutTitle = "U-Drive" #this will be the name of the shortcut
+$driveLetter = "I" #change to desired driveletter (don't use double colon : )
+$path = '\\nlfs01\Afdelingen' #change to desired server / share path
+$shortCutTitle = "I-Drive" #this will be the name of the shortcut
 $autosuggestLogin = $True #automatically prefills the login field of the auth popup with the user's O365 email (azure ad join)
 $desiredShortcutLocation = [Environment]::GetFolderPath("Desktop") #you can also use MyDocuments or any other valid input for the GetFolderPath function
 
@@ -55,11 +55,11 @@ try{
 }
 
 $scriptContent+= "
-`$serverPath = `"\\`$(([URI]`$sourcePath).Host)`"
+`$serverPath = `"`$(([URI]`$sourcePath).Host)`"
 #check if other mappings share the same path, in that case we shouldn't need credentials
 `$authRequired = `$true
 try{
-     `$count = @(get-psdrive -PSProvider filesystem | where-object {`$_.Root -and `$_.Root.StartsWith(`$serverPath)}).Count
+     `$count = @(get-psdrive -PSProvider filesystem | where-object {`$_.DisplayRoot -and `$_.DisplayRoot.Replace('\','').StartsWith(`$serverPath)}).Count
 }catch{`$Null}
 
 if(`$count -gt 0){
@@ -158,7 +158,7 @@ $WshShell = New-Object -comObject WScript.Shell
 $Shortcut = $WshShell.CreateShortcut((Join-Path $desiredShortcutLocation -ChildPath "$($shortCutTitle).lnk"))
 $Shortcut.TargetPath = "powershell.exe"
 $Shortcut.WorkingDirectory = "%SystemRoot%\WindowsPowerShell\v1.0\"
-$Shortcut.Arguments =  "-WindowStyle Hidden -ExecutionPolicy ByPass -File `"$desiredMapScriptPath`" $driveLetter `'$path`'"
+$Shortcut.Arguments =  "-WindowStyle Hidden -ExecutionPolicy ByPass -File `"$desiredMapScriptPath`" $driveLetter `"$path`""
 $Shortcut.IconLocation = "explorer.exe ,0"
 $shortcut.WindowStyle = 7
 $Shortcut.Save()

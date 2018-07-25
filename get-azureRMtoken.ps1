@@ -19,10 +19,15 @@ function get-azureRMToken(){
     Param(
         [Parameter(Mandatory=$true)]$Username,
         [Parameter(Mandatory=$true)]$Password
+        $tenantId
     )
     $secpasswd = ConvertTo-SecureString $Password -AsPlainText -Force
     $mycreds = New-Object System.Management.Automation.PSCredential ($Username, $secpasswd)
-    $res = login-azurermaccount -Credential $mycreds
+    if($tenantId){
+        $res = login-azurermaccount -Credential $mycreds -TenantId $tenantId.ToLower()
+    }else{
+        $res = login-azurermaccount -Credential $mycreds
+    }
     $context = Get-AzureRmContext
     $tenantId = $context.Tenant.Id
     $refreshToken = @($context.TokenCache.ReadItems() | where {$_.tenantId -eq $tenantId -and $_.ExpiresOn -gt (Get-Date)})[0].RefreshToken

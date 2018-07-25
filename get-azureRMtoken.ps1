@@ -10,6 +10,8 @@ function get-azureRMToken(){
       the UPN of a user with sufficient permissions to call the endpoint (this depends on what you'll use the token for)
       .PARAMETER Password
       Password of Username
+      .PARAMETER tenantId
+      If supplied, logs in to specified tenant.
       .NOTES
       filename: get-azureRMToken.ps1
       author: Jos Lieben

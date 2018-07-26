@@ -106,14 +106,13 @@ function get-azureRMADAppPermissionsReport(){
         "UserDisplayName"=$userInfo.displayName
         "UserPrincipalName"=$userInfo.userPrincipalName
         "accountEnabled"=$userInfo.accountEnabled
-        "appId"=$user.appId
-        "appDisplayName"=$user.appDisplayName
-        "Resource"=$user.Resource
-        "Permission"=$user.Permission
-        "RoleOrScopeClaim"=$user.RoleOrScopeClaim
-        "Description"=$user.Description}
+        "appId"=$userToApp.$user.appId
+        "appDisplayName"=$userToApp.$user.appDisplayName
+        "Resource"=$userToApp.$user.Resource
+        "Permission"=$userToApp.$user.Permission
+        "RoleOrScopeClaim"=$userToApp.$user.RoleOrScopeClaim
+        "Description"=$userToApp.$user.Description}
     }
     
     $userToAppTranslated | Export-Excel -workSheetName "UserToAppMapping" -path $reportPath -ClearSheet -TableName "UserToAppMapping" -AutoSize
-
 }

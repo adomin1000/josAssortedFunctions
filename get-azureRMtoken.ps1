@@ -20,7 +20,7 @@ function get-azureRMToken(){
     #>
     Param(
         [Parameter(Mandatory=$true)]$Username,
-        [Parameter(Mandatory=$true)]$Password
+        [Parameter(Mandatory=$true)]$Password,
         $tenantId
     )
     $secpasswd = ConvertTo-SecureString $Password -AsPlainText -Force

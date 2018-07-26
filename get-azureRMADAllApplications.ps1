@@ -32,7 +32,13 @@ function get-azureRMADAllApplications(){
     "__ko_mapping__"=@{"ignore"=@();"include"=@("_destroy");"copy"=@();"observe"=@();"mappedProperties"=@{"accountEnabled"=$(if($returnDisabledApplications){$null}else{$True});"isAppVisible"=$true;"appListQuery"=$true;"searchText"=$true;"top"=$true;"loadLogo"=$true;"putCachedLogoUrlOnly"=$true;"nextLink"=$true;"usedFirstPartyAppIds"=$true};"copiedProperties"=@{}}}
     $url = "https://main.iam.ad.ext.azure.com/api/ManagedApplications/List"
     $res = Invoke-RestMethod –Uri $url –Headers $header –Method POST -body ($body | convertto-Json) -ErrorAction Stop -ContentType "application/json"
-    $apps += $res.applist
+    foreach($app in $res.applist){
+        $additionalInfo = Invoke-RestMethod –Headers $header –Uri "https://main.iam.ad.ext.azure.com/api/EnterpriseApplications/$($app.objectId)/Properties?appId=$($app.appId)&loadLogo={2}" -Method GET -ErrorAction Stop -ContentType "application/json"
+        $app | add-member NoteProperty -name userAccessUrl -Value $additionalInfo.userAccessUrl
+        $app | add-member NoteProperty -name appRoleAssignmentRequired -Value $additionalInfo.appRoleAssignmentRequired
+        $app | add-member NoteProperty -name isApplicationVisible -Value $additionalInfo.isApplicationVisible
+        $apps += $app
+    }
     if($res.nextLink){
         $apps += get-azureRMADAllApplications -returnDisabledApplications:$returnDisabledApplications -nextLink $res.nextLink -token $token
     }

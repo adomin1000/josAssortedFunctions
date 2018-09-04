@@ -271,7 +271,7 @@ foreach($csvFile in $csvFiles){
     }
 }
 
-$userReport += "</table"
+$userReport += "</table>"
 
 $htmlContent += $userReport
 

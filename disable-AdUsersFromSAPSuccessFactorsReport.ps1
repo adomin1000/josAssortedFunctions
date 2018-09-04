@@ -85,7 +85,7 @@ Param(
 $executionPath = [System.IO.Path]::GetDirectoryName($myInvocation.MyCommand.Definition)
 $logFile = Join-Path $executionPath -ChildPath "disable-AdUsersFromSAPSfFTPSReport.log"
 $archivePath = Join-Path $executionPath -ChildPath "Archive"
-Start-Transcript -Path $logFile -Force
+Start-Transcript -Path $logFile -Force -
 
 if(![System.IO.Directory]::Exists($archivePath)){
     Write-Output "Archive folder $archivePath does not yet exist, attempting to create..."
@@ -228,7 +228,7 @@ foreach($csvFile in $csvFiles){
             Write-Error "Did not detect proper column $csvColumnName in CSV file for this row: $user" -ErrorAction Continue
             Continue
         }
-        $filter = "($adAttributeName -eq `"$($user.$csvColumnName)`")"
+        $filter = "($adAttributeName -eq `"$($user.$csvColumnName)`" -and objectClass -eq `"User`" -and objectCategory -eq `"Person`")"
         try{
             if($filter.Length -le 12){
                 Throw "Invalid filter used in searching for ADObjects: $filter, aborting to prevent mass-selecting users"

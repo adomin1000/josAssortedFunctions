@@ -1,13 +1,16 @@
 <#
     .SYNOPSIS
-    disables all AD users found in an SAP SuccessFactors report from an FTP server
+    disables Active Directory accounts of all AD users found in an SAP SuccessFactors CSV report from an sFTP server
     .DESCRIPTION
-    SAP usually comes with an sFTP server, you can configure SAP SuccessFactors to create CSV files with users whose contracts have been terminated. This script will fetch that CSV file and disable 
+    SAP usually comes with an sFTP server, you can configure SAP SuccessFactors (in the PerformanceManager) to create CSV files with users whose contracts have been terminated. This script will fetch that CSV file and disable 
     those users for your in your Active Directory
 
     This script requires WRITE access to the folder it is placed in as it will archive all CSV files to an archive folder
+    Run it on a Active Directory connected server with the Activedirectory powershell module installed. Also install the Posh-SSH module, or run elevated on Powershell V5 to auto-install.
+
+    Everything is logged to the script's folder, and all actions are emailed if you configure the script's email settings.
     .EXAMPLE
-    .\disable-AdUsersFromSAPSfFTPSReport.ps1 
+    .\disable-AdUsersFromSAPSuccessFactorsReport.ps1 
     .PARAMETER sFTPLogin
     The login name to use for your sFTP server
     Example: USER
@@ -55,7 +58,7 @@
     .PARAMETER doNotWipeProcessedCsvFilesFromFTP
     if specified, will not wipe processed CSV files from the FTP server. Warning: this means the script may process the file each time it runs
     .NOTES
-    filename: disable-AdUsersFromSAPSfFTPSReport.ps1
+    filename: disable-AdUsersFromSAPSuccessFactorsReport.ps1
     author: Jos Lieben
     blog: www.lieben.nu
     created: 04/09/2018

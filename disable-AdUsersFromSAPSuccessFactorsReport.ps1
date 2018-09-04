@@ -82,7 +82,7 @@ Param(
     [Switch]$doNotWipeProcessedCsvFilesFromFTP
 )
 
-$executionPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath('.\')
+$executionPath = [System.IO.Path]::GetDirectoryName($myInvocation.MyCommand.Definition)
 $logFile = Join-Path $executionPath -ChildPath "disable-AdUsersFromSAPSfFTPSReport.log"
 $archivePath = Join-Path $executionPath -ChildPath "Archive"
 Start-Transcript -Path $logFile -Force

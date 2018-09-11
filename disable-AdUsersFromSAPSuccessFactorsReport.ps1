@@ -303,3 +303,9 @@ if($MailServer -and $MailTo){
         }
     }
 }
+
+Stop-Transcript
+
+Sleep -s 1
+
+Move-Item -Path $logFile -Destination (Join-Path -Path $archivePath -ChildPath "$(Get-Date -format "dd-MM-yyyy-HH-mm")disable-AdUsersFromSAPSfFTPSReport.log") -Force

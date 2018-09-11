@@ -57,6 +57,8 @@
     Switch parameter, if specified, will only report but not actually disable any users and will not delete files from the ftp server
     .PARAMETER doNotWipeProcessedCsvFilesFromFTP
     if specified, will not wipe processed CSV files from the FTP server. Warning: this means the script may process the file each time it runs
+    .PARAMETER writeNoteToDescriptionField
+    if specified, will write to the AD description field that the user was disabled by this script
     .NOTES
     filename: disable-AdUsersFromSAPSuccessFactorsReport.ps1
     author: Jos Lieben
@@ -79,13 +81,14 @@ Param(
     [String]$MailServerPassword,
     [Switch]$MailUseSSL,
     [Switch]$readOnly,
-    [Switch]$doNotWipeProcessedCsvFilesFromFTP
+    [Switch]$doNotWipeProcessedCsvFilesFromFTP,
+    [Switch]$writeNoteToDescriptionField
 )
 
 $executionPath = [System.IO.Path]::GetDirectoryName($myInvocation.MyCommand.Definition)
 $logFile = Join-Path $executionPath -ChildPath "disable-AdUsersFromSAPSfFTPSReport.log"
 $archivePath = Join-Path $executionPath -ChildPath "Archive"
-Start-Transcript -Path $logFile -Force -
+Start-Transcript -Path $logFile -Force
 
 if(![System.IO.Directory]::Exists($archivePath)){
     Write-Output "Archive folder $archivePath does not yet exist, attempting to create..."
@@ -258,6 +261,9 @@ foreach($csvFile in $csvFiles){
             try{
                 if(!$readOnly){
                     Disable-ADAccount -Identity $adUser.ObjectGUID -Confirm:$False -ErrorAction Stop
+                    if($writeNoteToDescriptionField){
+                        Set-ADAccount -Identity $adUser.ObjectGUID -Description "User deactivated from SuccessFactors on $(Get-Date)"-Confirm:$False -ErrorAction Continue
+                    }
                 }
                 $userReport += "<tr><td>$($user.$csvColumnName)</td><td>$($adUser.Name)</td><td><font color=`"green`">SUCCEEDED</font></td><td>User disabled</td></tr>"
                 Write-Output "$($adUser.Name) disabled"

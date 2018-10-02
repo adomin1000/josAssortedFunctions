@@ -27,7 +27,7 @@
     Filename of the csv report, if not specified, will use ALL files ending in .csv found in the folder path
     Example: userdelta.csv
     .PARAMETER csvColumnName
-    Name of the CSV column to identity the user (by email), this column should exist in the CSV file. The value is used to search your AD for this user.
+     CSV column to identity the user, this column should exist in the CSV file. The value is used to search your AD for this user.
     Example: "Email-User"
     .PARAMETER adAttributeName
     Name of the ad attribute to search by, e.g. if your CSV contains email addresses, set this to 'mail' to search AD for users with a mail attribute that matches the value in the CSV
@@ -227,12 +227,12 @@ foreach($csvFile in $csvFiles){
     }
     foreach($user in $csvFileContents){
         try{
-            $rowToString = $((($csv[0].psobject.Properties | where {$_.MemberType -eq "NoteProperty"  }).Value -Join ","))
+            $rowToString = $((($user[0].psobject.Properties | where {$_.MemberType -eq "NoteProperty"  }).Value -Join ","))
         }catch{
             $rowToString = "Unknown"
         }
         if(!$user.$csvColumnName){
-            $userReport += "<tr><td>$csvColumnName</td><td>$rowToString</td><td><font color=`"red`">FAILED</font></td><td>The CSV file did not have a column named $csvColumnName</td></tr>"
+            $userReport += "<tr><td>$csvColumnName</td><td>Unknown</td><td><font color=`"red`">FAILED</font></td><td>The CSV file did not have a column named $($csvColumnName): $rowToString</td></tr>"
             Write-Error "Did not detect proper column $csvColumnName in CSV file for this row: $user" -ErrorAction Continue
             Continue
         }
@@ -247,13 +247,13 @@ foreach($csvFile in $csvFiles){
                 Throw "Multiple users returned when searching by $filter, skipping this user"
             }
             if($adUser.Count -eq 0){
-                $userReport += "<tr><td>$($user.$csvColumnName)</td><td>$rowToString</td><td><font color=`"orange`">FAILED</font></td><td>Could not find a user in AD searching for a user with $adAttributeName = $($user.$csvColumnName)</td></tr>"
+                $userReport += "<tr><td>$($user.$csvColumnName)</td><td>Unknown</td><td><font color=`"orange`">FAILED</font></td><td>Could not find a user in AD searching for a user with $adAttributeName = $($user.$csvColumnName). CSV content: $rowToString</td></tr>"
                 Write-Output "Did not find a user in AD when searching using filter $filter"
                 continue
             }
             Write-Output "$($adUser.Name) found in AD"
         }catch{
-            $userReport += "<tr><td>$($user.$csvColumnName)</td><td>$rowToString</td><td><font color=`"red`">FAILED</font></td><td>Could not find a user in AD because of an error: $($_.Exception), see log for details</td></tr>"
+            $userReport += "<tr><td>$($user.$csvColumnName)</td><td>Unknown</td><td><font color=`"red`">FAILED</font></td><td>Could not find a user in AD because of an error: $($_.Exception), see log for details. CSV content: $rowToString</td></tr>"
             Write-Error "Failed to retrieve user, skipping" -ErrorAction Continue
             Write-Error $_ -ErrorAction Continue
             Continue

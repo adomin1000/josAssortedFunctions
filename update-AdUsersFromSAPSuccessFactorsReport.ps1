@@ -27,18 +27,18 @@
     Filename of the csv report, if not specified, will use ALL files ending in .csv found in the folder path
     Example: userdelta.csv
     .PARAMETER csvIdentifingColumnName
-    Name of the CSV column to identify the user (by email), this column should exist in the CSV file and the value is used to search your AD for a corresponding user.
-    Example: "Email-User"
+    CSV column to identify the user, this column should exist in the CSV file and the value is used to search your AD for a corresponding user.
+    Example: "Email"
     .PARAMETER adIdentifingPropertyName
     Name of the active directory property that identifies the user, it'll be used when searching AD for csvIdentifyingColumnName
     Example: "mail"
     .PARAMETER csvSourceAttributeNames
     Names of the CSV columns you wish to use to update your AD with as an array (double quotes for each column, seperated by comma like the example)
-    Example: "Firstname","Lastname","Title"
+    Example: "Firstname","Lastname","Position","Email-Manager","Location","Business Phone","Department"
     .PARAMETER adTargetAttributeNameNames
     Names of the Active Directory attributes you wish to update with info from the CSV (use attribute editor to determine the names of fields)
     Make sure the ORDER of these is the same as csvSourceAttributeNames as they will be mapped as such. Seperate multiple by comma and enclose each field with double quotes like the example
-    Example: "givenName","sn","title"
+    Example: "givenName","sn","title","manager","physicalDeliveryOfficeName","telephoneNumber","department"
     .PARAMETER MailServer
     hostname of your mailserver, if left empty, no notifications will be sent
     Example: "smtp.outlook.com"
@@ -78,7 +78,7 @@ Param(
     [Parameter(Mandatory=$true)][String]$sFTPHost,
     [String]$sFTPFolderPath,
     [String]$sFTPFileName,
-    [String]$csvIdentifingColumnName = "Email-User",
+    [String]$csvIdentifingColumnName = "Email",
     [String]$adIdentifingPropertyName = "mail",
     [Parameter(Mandatory=$true)][Array]$csvSourceAttributeNames,
     [Parameter(Mandatory=$true)][Array]$adTargetAttributeNameNames,
@@ -235,12 +235,12 @@ foreach($csvFile in $csvFiles){
     }
     foreach($user in $csvFileContents){
         try{
-            $rowToString = $((($csv[0].psobject.Properties | where {$_.MemberType -eq "NoteProperty"  }).Value -Join ","))
+            $rowToString = $((($user[0].psobject.Properties | where {$_.MemberType -eq "NoteProperty"  }).Value -Join ","))
         }catch{
             $rowToString = "Unknown"
         }
         if(!$user.$csvIdentifingColumnName){
-            $userReport += "<tr><td>$csvIdentifingColumnName</td><td>$rowToString</td><td><font color=`"red`">FAILED</font></td><td>The CSV file did not have a column named $csvIdentifingColumnName</td></tr>"
+            $userReport += "<tr><td>$csvIdentifingColumnName</td><td>Unknown</td><td><font color=`"red`">FAILED</font></td><td>The CSV file did not have a column named $($csvIdentifingColumnName): $rowToString</td></tr>"
             Write-Error "Did not detect proper column $csvIdentifingColumnName in CSV file for this row: $user" -ErrorAction Continue
             Continue
         }
@@ -255,13 +255,13 @@ foreach($csvFile in $csvFiles){
                 Throw "Multiple users returned when searching by $filter, skipping this user"
             }
             if($adUser.Count -eq 0){
-                $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>$rowToString</td><td><font color=`"orange`">FAILED</font></td><td>Could not find a user in AD searching for a user with $adIdentifingPropertyName = $($user.$csvIdentifingColumnName)</td></tr>"
+                $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>Unknown</td><td><font color=`"orange`">FAILED</font></td><td>Could not find a user in AD searching for a user with $adIdentifingPropertyName = $($user.$csvIdentifingColumnName). CSV source: $rowToString</td></tr>"
                 Write-Output "Did not find a user in AD when searching using filter $filter"
                 continue
             }
             Write-Output "$($adUser.Name) found in AD"
         }catch{
-            $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>$rowToString</td><td><font color=`"red`">FAILED</font></td><td>Could not find a user in AD because of an error: $($_.Exception), see log for details</td></tr>"
+            $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>Unknown</td><td><font color=`"red`">FAILED</font></td><td>Could not find a user in AD because of an error: $($_.Exception), see log for details. CSV source: $rowToString</td></tr>"
             Write-Error "Failed to retrieve user, skipping" -ErrorAction Continue
             Write-Error $_ -ErrorAction Continue
             Continue
@@ -269,7 +269,48 @@ foreach($csvFile in $csvFiles){
         for($i=0; $i -lt $csvSourceAttributeNames.Count;$i++){
             $sourceAttributeValue = $user."$($csvSourceAttributeNames[$i])"
             $targetAttributeName = $adTargetAttributeNameNames[$i]
-            if($sourceAttributeValue -and $targetAttributeName -and $adUser."$targetAttributeName" -ne $sourceAttributeValue){
+            if($targetAttributeName -eq "manager" -and $sourceAttributeValue.Length -gt 5){
+                #THIS IS A SPECIAL ATTRIBUTE FOR MANAGERS THAT NEEDS AN EXTRA LOOKUP!
+                $filter = "($adIdentifingPropertyName -eq `"$($sourceAttributeValue)`" -and objectClass -eq `"User`" -and objectCategory -eq `"Person`")"
+                try{
+                    if($filter.Length -le 12){
+                        Throw "Invalid filter used in searching for ADObjects: $filter, aborting to prevent mass-selecting users"
+                    }
+                    Write-Verbose "Searching AD for users using filter $filter"
+                    $adManager = Get-ADObject -Filter $filter -ErrorAction Stop -Properties *
+                    if($adManager.Count -gt 1){
+                        Throw "Multiple users returned when searching by $filter, skipping this user"
+                    }
+                    if($adManager.Count -eq 0){
+                        $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>$($adUser.Name)</td><td><font color=`"orange`">FAILED</font></td><td>Could not find manager in AD searching for $adIdentifingPropertyName = $($sourceAttributeValue). CSV source: $rowToString</td></tr>"
+                        Write-Output "Did not find user's manager in AD when searching using filter $filter"
+                        continue
+                    }
+                    Write-Output "$($adManager.Name) found as manager of $($adUser.Name) in AD"
+                }catch{
+                    $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>$($adUser.Name)</td><td><font color=`"red`">FAILED</font></td><td>Could not find user's manager in AD because of an error: $($_.Exception), see log for details. CSV source: $rowToString</td></tr>"
+                    Write-Error "Failed to retrieve user manager, skipping" -ErrorAction Continue
+                    Write-Error $_ -ErrorAction Continue
+                    Continue
+                }
+                if($sourceAttributeValue -ne $adManager.distinguishedName){
+                    try{
+                        if(!$readOnly){
+                            Set-ADObject -Identity $adUser.ObjectGUID -Replace @{$targetAttributeName=$adManager.distinguishedName} -Confirm:$False
+                        }
+                        $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>$($adUser.Name)</td><td><font color=`"green`">SUCCEEDED</font></td><td>$targetAttributeName updated to $($adManager.Name)</td></tr>"
+                        Write-Output "User $targetAttributeName updated to $($adManager.Name)"
+                    }catch{
+                        $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>$($adUser.Name)</td><td><font color=`"red`">FAILED</font></td><td>$targetAttributeName could not be updated to $($adManager.Name) because of an error: $($_.Exception), see log for details</td></tr>"
+                        Write-Error "Failed to update $targetAttributeName to $($adManager.Name)" -ErrorAction Continue
+                        Write-Error $_
+                        Continue
+                    }
+                }
+                continue
+                #END OF SPECIAL LOOKUP FOR MANAGERS
+            }
+            if($sourceAttributeValue.Length -gt 1 -and $targetAttributeName -and $adUser."$targetAttributeName" -ne $sourceAttributeValue){
                 try{
                     if(!$readOnly){
                         Set-ADObject -Identity $adUser.ObjectGUID -Replace @{$targetAttributeName=$sourceAttributeValue} -Confirm:$False

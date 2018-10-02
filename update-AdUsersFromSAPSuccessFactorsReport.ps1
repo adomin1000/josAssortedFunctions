@@ -234,8 +234,13 @@ foreach($csvFile in $csvFiles){
         Continue
     }
     foreach($user in $csvFileContents){
+        try{
+            $rowToString = $((($csv[0].psobject.Properties | where {$_.MemberType -eq "NoteProperty"  }).Value -Join ","))
+        }catch{
+            $rowToString = "Unknown"
+        }
         if(!$user.$csvIdentifingColumnName){
-            $userReport += "<tr><td>$csvIdentifingColumnName</td><td>Unknown</td><td><font color=`"red`">FAILED</font></td><td>The CSV file did not have a column named $csvIdentifingColumnName</td></tr>"
+            $userReport += "<tr><td>$csvIdentifingColumnName</td><td>$rowToString</td><td><font color=`"red`">FAILED</font></td><td>The CSV file did not have a column named $csvIdentifingColumnName</td></tr>"
             Write-Error "Did not detect proper column $csvIdentifingColumnName in CSV file for this row: $user" -ErrorAction Continue
             Continue
         }
@@ -250,13 +255,13 @@ foreach($csvFile in $csvFiles){
                 Throw "Multiple users returned when searching by $filter, skipping this user"
             }
             if($adUser.Count -eq 0){
-                $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>Unknown</td><td><font color=`"orange`">FAILED</font></td><td>Could not find a user in AD searching for a user with $adIdentifingPropertyName = $($user.$csvIdentifingColumnName)</td></tr>"
+                $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>$rowToString</td><td><font color=`"orange`">FAILED</font></td><td>Could not find a user in AD searching for a user with $adIdentifingPropertyName = $($user.$csvIdentifingColumnName)</td></tr>"
                 Write-Output "Did not find a user in AD when searching using filter $filter"
                 continue
             }
             Write-Output "$($adUser.Name) found in AD"
         }catch{
-            $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>Unknown</td><td><font color=`"red`">FAILED</font></td><td>Could not find a user in AD because of an error: $($_.Exception), see log for details</td></tr>"
+            $userReport += "<tr><td>$($user.$csvIdentifingColumnName)</td><td>$rowToString</td><td><font color=`"red`">FAILED</font></td><td>Could not find a user in AD because of an error: $($_.Exception), see log for details</td></tr>"
             Write-Error "Failed to retrieve user, skipping" -ErrorAction Continue
             Write-Error $_ -ErrorAction Continue
             Continue

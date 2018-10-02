@@ -262,7 +262,7 @@ foreach($csvFile in $csvFiles){
                 if(!$readOnly){
                     Disable-ADAccount -Identity $adUser.ObjectGUID -Confirm:$False -ErrorAction Stop
                     if($writeNoteToDescriptionField){
-                        Set-ADAccount -Identity $adUser.ObjectGUID -Description "User deactivated from SuccessFactors on $(Get-Date)"-Confirm:$False -ErrorAction Continue
+                        Set-ADObject -Identity $adUser.ObjectGUID -Description "User deactivated from SuccessFactors on $(Get-Date)"-Confirm:$False -ErrorAction Continue
                     }
                 }
                 $userReport += "<tr><td>$($user.$csvColumnName)</td><td>$($adUser.Name)</td><td><font color=`"green`">SUCCEEDED</font></td><td>User disabled</td></tr>"

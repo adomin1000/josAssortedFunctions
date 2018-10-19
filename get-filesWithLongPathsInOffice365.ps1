@@ -69,7 +69,7 @@ foreach($site in $sites){
         Connect-PnPOnline $site.FieldValues.SiteUrl -Credentials $Credential
     }
     $lists = Get-PnPList -Includes BaseTemplate,EntityTypeName
-    $lists | where {$_.BaseType -eq "DocumentLibrary" -and ($_.EntityTypeName -eq "Documents" -or $_.EntityTypeName -eq "Shared_x0020_Documents")} | % {
+    $lists | where {$_.BaseTemplate -eq 101} | % {
         Write-Output "Detected document library $($_.Title) with Id $($_.Id) and Url $($_.SiteUrl), processing..."
         $items = Get-PnPListItem -List $_
         foreach($item in $items){

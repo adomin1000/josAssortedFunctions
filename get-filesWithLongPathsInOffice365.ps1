@@ -28,7 +28,7 @@
 #>
 Param(
     [String]$fileExtension,
-    [Int]$maxPathLength=220,
+    [Int]$maxPathLength=218,
     [Parameter(Mandatory=$true)][String]$tenantName,
     [Switch]$useMFA,
     [Switch]$exportCSV

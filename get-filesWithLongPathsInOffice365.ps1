@@ -38,9 +38,9 @@ Param(
         write-Output "$Name Powershell module not installed...trying to Install, this will fail in an unelevated session"
         #Check if elevated
         If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")){   
-            $arguments = "& '" + $myinvocation.mycommand.definition + "'"
-            Start-Process powershell -Verb runAs -ArgumentList $arguments
-            Break
+            Write-Output "Please restart this script in elevated mode!"
+            Read-Host "Press any key to continue"
+            Exit
         }
         try{
             Install-Module $Name -SkipPublisherCheck -Force -Confirm:$False

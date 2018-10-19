@@ -54,7 +54,7 @@ Param(
     }
     try{
         Write-Output "loading module"
-        Import-Module $Name -DisableNameChecking -Force -NoClobber        Write-Output "module loaded"    }catch{        Write-Output "failed to load module"    }}Load-Module SharePointPnPPowerShellOnlineLoad-Module SharePointPnPPowerShell2016Load-Module SharePointPnPPowerShell2013if(!$useMFA){    $Credential = Get-Credential}if($useMFA){    Connect-PnPOnline "https://$tenantName-admin.sharepoint.com" -UseWebLogin
+        Import-Module $Name -DisableNameChecking -Force -NoClobber        Write-Output "module loaded"    }catch{        Write-Output "failed to load module"    }}Load-Module SharePointPnPPowerShellOnlineif(!$useMFA){    $Credential = Get-Credential}if($useMFA){    Connect-PnPOnline "https://$tenantName-admin.sharepoint.com" -UseWebLogin
 }else{
     Connect-PnPOnline "https://$tenantName-admin.sharepoint.com" -Credentials $Credential
 }
@@ -97,7 +97,7 @@ foreach($site in $sites){
 }
 if($exportCSV){
     $path = Join-Path $Env:TEMP -ChildPath "filesWithLongPaths.csv"
-    $reportRows | export-csv -Path $path -Force -NoClobber -NoTypeInformation -Encoding UTF8
+    $reportRows | export-csv -Path $path -Force -NoTypeInformation -Encoding UTF8
     Write-Output "data exported to $path"
 }
 $reportRows | Out-GridView

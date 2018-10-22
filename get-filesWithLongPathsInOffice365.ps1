@@ -71,7 +71,7 @@ foreach($site in $sites){
     $lists = Get-PnPList -Includes BaseTemplate,EntityTypeName
     $lists | where {$_.BaseTemplate -eq 101} | % {
         Write-Output "Detected document library $($_.Title) with Id $($_.Id) and Url $($_.SiteUrl), processing..."
-        $items = Get-PnPListItem -List $_
+        $items = Get-PnPListItem -List $_ -PageSize 2000
         foreach($item in $items){
             if($item.FileSystemObjectType -eq "Folder"){
                 continue #Mapjes skippen we!

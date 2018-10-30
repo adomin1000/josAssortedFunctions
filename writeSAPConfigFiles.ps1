@@ -27,7 +27,7 @@ Write-Output "Attempting to write to $globalFilePath"
 $globalFileContent = "<?xml version=`"1.0`" encoding=`"UTF-8`"?>
 <Landscape><Messageservers/></Landscape>"
 
-$globalFileContent | Out-File $globalFilePath -Force
+$globalFileContent | Out-File $globalFilePath -Force -Encoding oem
 
 $connectionsFileContent = "<?xml version=`"1.0`" encoding=`"utf-8`"?>
 <Landscape updated=`"2018-09-04T07:43:39Z`" version=`"1`" generator=`"SAP GUI for Windows v7500.2.5.131`">

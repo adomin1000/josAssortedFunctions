@@ -28,10 +28,10 @@ function get-azureRMADAppPermissions(){
         'x-ms-client-request-id'= [guid]::NewGuid()
         'x-ms-correlation-id' = [guid]::NewGuid()}
     $url = "https://main.iam.ad.ext.azure.com/api/EnterpriseApplications/$appId/ServicePrincipalPermissions?consentType=Admin&userObjectId="
-    $res = Invoke-RestMethod –Uri $url –Headers $header –Method GET -ErrorAction Stop -ContentType "application/json"
+    $res = Invoke-RestMethod -Uri $url -Headers $header -Method GET -ErrorAction Stop -ContentType "application/json"
     $permissions.admin += $res
     $url = "https://main.iam.ad.ext.azure.com/api/EnterpriseApplications/$appId/ServicePrincipalPermissions?consentType=User&userObjectId="
-    $res = Invoke-RestMethod –Uri $url –Headers $header –Method GET -ErrorAction Stop -ContentType "application/json"
+    $res = Invoke-RestMethod -Uri $url -Headers $header -Method GET -ErrorAction Stop -ContentType "application/json"
     $permissions.user += $res
     return $permissions
 }

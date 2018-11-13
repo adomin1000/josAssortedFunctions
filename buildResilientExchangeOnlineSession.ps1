@@ -12,24 +12,22 @@
     $res = Export-PSSession -Session $Session -CommandName * -OutputModule $temporaryModulePath -AllowClobber -Force
     $temporaryModulePath = Join-Path $temporaryModulePath -ChildPath "temporaryEXOModule.psm1"
     Write-Verbose "Rewriting Exchange Online module, please wait a few minutes..."
+    $reader = [System.IO.File]::OpenText($temporaryModulePath)
     [String]$newContent
     $found = $False
-    (Get-Content $temporaryModulePath) | % {
-        if(!$found -and $_.IndexOf("host.UI.PromptForCredential(") -ge 0){
+    while($null -ne ($line = $reader.ReadLine())) {
+        if(!$found -and $line.IndexOf("host.UI.PromptForCredential(") -ge 0){
             $line = "-Credential `$global:o365Creds ``"
-            if($line){
-                $found = $True
-            }
+            $found = $True
         }
         if($line){
             $newContent += $line
-            $line=$Null
-        }else{
-            $newContent += $_
         }
         $newContent += "`r`n"
     }
+    $reader.Close()
     $newContent | Out-File -FilePath $temporaryModulePath -Force -Confirm:$False -ErrorAction Stop
+
     $Session | Remove-PSSession -Confirm:$False
     Write-Verbose "Module rewritten, re-importing..."
     if($commandPrefix){

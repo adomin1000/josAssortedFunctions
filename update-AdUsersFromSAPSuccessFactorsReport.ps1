@@ -293,7 +293,7 @@ foreach($csvFile in $csvFiles){
                     Write-Error $_ -ErrorAction Continue
                     Continue
                 }
-                if($sourceAttributeValue -ne $adManager.distinguishedName){
+                if($adUser.manager -ne $adManager.distinguishedName){
                     try{
                         if(!$readOnly){
                             Set-ADObject -Identity $adUser.ObjectGUID -Replace @{$targetAttributeName=$adManager.distinguishedName} -Confirm:$False

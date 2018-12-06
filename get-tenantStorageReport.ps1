@@ -24,8 +24,6 @@ Function get-tenantStorageReport{
         [Parameter(Mandatory=$true)][String]$tenant
     )
 
-    $warningMBRemaining = $warningGBRemaining*1024
-
     $overviewReport = @()
     $tenantReports = @{}
 

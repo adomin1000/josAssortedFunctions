@@ -10,7 +10,7 @@
     $res = login-azurermaccount -Credential $mycreds
     $context = Get-AzureRmContext
     $tenantId = $context.Tenant.Id
-    $refreshToken = $context.TokenCache.ReadItems().RefreshToken
+    $refreshToken = @($context.TokenCache.ReadItems() | Where-Object {$_.tenantId -eq $tenantId -and $_.ExpiresOn -gt (Get-Date)})[0].RefreshToken
     $body = "grant_type=refresh_token&refresh_token=$($refreshToken)&resource=74658136-14ec-4630-ad9b-26e160ff0fc6"
     $apiToken = Invoke-RestMethod "https://login.windows.net/$tenantId/oauth2/token" -Method POST -Body $body -ContentType 'application/x-www-form-urlencoded'
     $header = @{

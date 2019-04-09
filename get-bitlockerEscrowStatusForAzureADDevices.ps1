@@ -79,10 +79,14 @@
             Continue
         }
         $keysKnownToAzure = $False
+        $osDriveEncrypted = $False
         $lastKeyUploadDate = $Null
-        if($device.bitLockerKey.Count -gt 0){
+        if($device.deviceOSType -eq "Windows" -and $device.bitLockerKey.Count -gt 0){
             $keysKnownToAzure = $True
             $keys = $device.bitLockerKey | Sort-Object -Property creationTime -Descending
+            if($keys.driveType -contains "Operating system drive"){
+                $osDriveEncrypted = $True
+            }
             $lastKeyUploadDate = $keys[0].creationTime
             if($showBitlockerKeysInReport){
                 $bitlockerKeys = ""
@@ -93,10 +97,10 @@
                 $bitlockerKeys = "HIDDEN FROM REPORT: READ INSTRUCTIONS TO REVEAL KEYS"
             }
         }else{
-            $bitlockerKeys = "NOT UPLOADED YET"
+            $bitlockerKeys = "NOT UPLOADED YET OR N/A"
         }
 
-        $csvEntries += [PSCustomObject]@{"Name"=$device.displayName;"BitlockerKeysUploadedToAzureAD"=$keysKnownToAzure;"lastKeyUploadDate"=$lastKeyUploadDate;"Enabled"=$device.accountEnabled;"managed"=$device.isManaged;"ManagedBy"=$device.managedBy;"lastLogon"=$device.approximateLastLogonTimeStamp;"Owner"=$device.Owner.userPrincipalName;"bitlockerKeys"=$bitlockerKeys;"OS"=$device.deviceOSType;"OSVersion"=$device.deviceOSVersion;"Trust Type"=$device.deviceTrustType;"dirSynced"=$device.dirSyncEnabled;"Compliant"=$device.isCompliant}
+        $csvEntries += [PSCustomObject]@{"Name"=$device.displayName;"BitlockerKeysUploadedToAzureAD"=$keysKnownToAzure;"OS Drive encrypted"=$osDriveEncrypted;"lastKeyUploadDate"=$lastKeyUploadDate;"Enabled"=$device.accountEnabled;"managed"=$device.isManaged;"ManagedBy"=$device.managedBy;"lastLogon"=$device.approximateLastLogonTimeStamp;"Owner"=$device.Owner.userPrincipalName;"bitlockerKeys"=$bitlockerKeys;"OS"=$device.deviceOSType;"OSVersion"=$device.deviceOSVersion;"Trust Type"=$device.deviceTrustType;"dirSynced"=$device.dirSyncEnabled;"Compliant"=$device.isCompliant}
     }
     $csvEntries | Export-Excel -workSheetName "BitlockerReport" -path "BitLockerReport.xlsx" -ClearSheet -TableName "BitlockerReport" -AutoSize -Verbose
 }

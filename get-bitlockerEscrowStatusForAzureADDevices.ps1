@@ -75,7 +75,7 @@
 
     $csvEntries = @()
     foreach($device in $allDevices){
-        if(!$showAllOSTypesInReport -and $device.deviceOSType -ne "Windows"){
+        if(!$showAllOSTypesInReport -and $device.deviceOSType -notlike "Windows*"){
             Continue
         }
         $keysKnownToAzure = $False
@@ -100,7 +100,7 @@
             $bitlockerKeys = "NOT UPLOADED YET OR N/A"
         }
 
-        $csvEntries += [PSCustomObject]@{"Name"=$device.displayName;"BitlockerKeysUploadedToAzureAD"=$keysKnownToAzure;"OS Drive encrypted"=$osDriveEncrypted;"lastKeyUploadDate"=$lastKeyUploadDate;"Enabled"=$device.accountEnabled;"managed"=$device.isManaged;"ManagedBy"=$device.managedBy;"lastLogon"=$device.approximateLastLogonTimeStamp;"Owner"=$device.Owner.userPrincipalName;"bitlockerKeys"=$bitlockerKeys;"OS"=$device.deviceOSType;"OSVersion"=$device.deviceOSVersion;"Trust Type"=$device.deviceTrustType;"dirSynced"=$device.dirSyncEnabled;"Compliant"=$device.isCompliant}
+        $csvEntries += [PSCustomObject]@{"Name"=$device.displayName;"BitlockerKeysUploadedToAzureAD"=$keysKnownToAzure;"OS Drive encrypted"=$osDriveEncrypted;"lastKeyUploadDate"=$lastKeyUploadDate;"DeviceAccountEnabled"=$device.accountEnabled;"managed"=$device.isManaged;"ManagedBy"=$device.managedBy;"lastLogon"=$device.approximateLastLogonTimeStamp;"Owner"=$device.Owner.userPrincipalName;"bitlockerKeys"=$bitlockerKeys;"OS"=$device.deviceOSType;"OSVersion"=$device.deviceOSVersion;"Trust Type"=$device.deviceTrustType;"dirSynced"=$device.dirSyncEnabled;"Compliant"=$device.isCompliant}
     }
     $csvEntries | Export-Excel -workSheetName "BitlockerReport" -path "BitLockerReport.xlsx" -ClearSheet -TableName "BitlockerReport" -AutoSize -Verbose
 }

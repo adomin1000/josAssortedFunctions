@@ -8,7 +8,7 @@
 #@michael_mardahl for the idea to remove the script from the registry so it automatically reruns
 #@Justin Murray for a .NET example of how to impersonate a logged in user
 
-$autoRerun = 10 #If set to 0, only runs at logon, else, runs every X minutes, expect random delays of up to 5 minutes due to bandwidth, service availability, local resources etc
+$autoRerun = 10 #If set to 0, only runs at logon, else, runs every X minutes AND at logon, expect random delays of up to 5 minutes due to bandwidth, service availability, local resources etc
 
 if($Env:USERPROFILE.EndsWith("system32\config\systemprofile")){
     $runningAsSystem = $True

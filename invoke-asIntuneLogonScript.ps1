@@ -4,6 +4,7 @@
 #Date:             11-06-2019
 #Purpose:          Using this code in ANY Intune script 
 #Requirements:     Windows 10 build 1803
+#License:          Free to use and modify non-commercially, leave headers intact. For commercial use, contact me
 #Thanks to:
 #@michael_mardahl for the idea to remove the script from the registry so it automatically reruns
 #@Justin Murray for a .NET example of how to impersonate a logged in user
@@ -313,7 +314,7 @@ if($runningAsSystem){
     
     #start a seperate process to remove registry key periodically for this script so IME thinks it never ran
     if($autoRerun -gt 0){
-        start-process "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList "`$slept = 0;while(`$true){if($autoRerun -gt 0){`$slept += 1;if(`$slept -gt $autoRerun){`$slept=0;Remove-Item $regPath -Force -Confirm:`$False -ErrorAction SilentlyContinue;Restart-Service -Name IntuneManagementExtension -Force;};};Start-Sleep -s 60;}"    
+        start-process "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList "`$slept = 0;while(`$true){`$slept += 1;if(`$slept -gt $autoRerun){`$slept=0;Remove-Item $regPath -Force -Confirm:`$False -ErrorAction SilentlyContinue;Restart-Service -Name IntuneManagementExtension -Force;};Start-Sleep -s 60;}"    
     }
     
     #set removal key in case computer crashes or something like that

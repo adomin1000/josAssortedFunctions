@@ -2,7 +2,8 @@
 #Author:           Jos Lieben
 #Author Blog:      http://www.lieben.nu
 #Date:             12-06-2019
-#Purpose:          Configure Onedrive for Business and optionally mount a number of teamsites (or SpO) and redirect any folder to ANY of those locations
+#License:          Free to use and modify non-commercially, leave headers intact. For commercial use, contact me or my employer
+#Purpose:          Configure Onedrive for Business and optionally mount a number of teamsites (or SpO sites) and redirect any folder to ANY of those locations
 #Requirements:     Windows 10 build 1803, Onedrive preinstalled / configured (see my blog for instructions on fully automating that)
 #Thanks to:
 #@michael_mardahl for the ODOPEN example and the idea to remove the script from the registry so it automatically reruns
@@ -13,11 +14,19 @@
 
 $autoRerunMinutes = 0 #If set to 0, only runs at logon, else, runs every X minutes AND at logon, expect random delays of up to 5 minutes due to bandwidth, service availability, local resources etc
 $tenantId = "36c42d4f-475f-4877-84bb-a2abb69ed283" #you can use https://gitlab.com/Lieben/assortedFunctions/blob/master/get-tenantIdFromLogin.ps1 to get your tenant ID
+
+#The following Sharepoint and/or Teams libraries will be automatically synced by your user's Onedrive
+#title        ==> The display name, don't change this later or the folder will be synced twice
+#syncUrl      ==> the ODOpen URL 
 $listOfLibrariesToAutoMount = @(
     @{"title" = "AutoMapTestTeam";"syncUrl" = "tenantId=36c42d4f%2D475f%2D4877%2D84bb%2Da2abb69ed283&siteId=%7B80e20d93%2D3830%2D4886%2D86a3%2Dc5b4b773fb8d%7D&webId=%7B49e5a630%2D5c42%2D42ae%2D9042%2D8ea64029c135%7D&listId=%7BED3B83ED%2D396F%2D4535%2DB35C%2DCFB9690945FA%7D&folderId=7d0fed8a%2Decf8%2D4733%2D9f05%2D40b2d87e40cd&webUrl=https%3A%2F%2Fonedrivemapper%2Esharepoint%2Ecom%2Fsites%2FAutoMapTestTeam&version=1"}
 )
 
-#The following folders will be redirected using standard Folder Redirection
+<#example config if you only want to sync Onedrive
+$listOfLibrariesToAutoMount = @()
+#>
+
+#The following folders will be redirected using native windows Folder Redirection
 #knownFolderInternalName          ==> choose from: 'AdminTools','ApplicationData','CDBurning','CommonAdminTools','CommonApplicationData','CommonDesktopDirectory','CommonDocuments','CommonMusic','CommonOemLinks','CommonPictures','CommonProgramFiles','CommonProgramFilesX86','CommonPrograms','CommonStartMenu','CommonStartup','CommonTemplates','CommonVideos','Cookies','Downloads','Desktop','DesktopDirectory','Favorites','Fonts','History','InternetCache','LocalApplicationData','LocalizedResources','MyComputer','MyDocuments','MyMusic','MyPictures','MyVideos','NetworkShortcuts','Personal','PrinterShortcuts','ProgramFiles','ProgramFilesX86','Programs','Recent','Resources','SendTo','StartMenu','Startup','System','SystemX86','Templates','UserProfile','Windows'
 #knownFolderInternalIdentifier    ==> choose from: 'AddNewPrograms', 'AdminTools', 'AppUpdates', 'CDBurning', 'ChangeRemovePrograms', 'CommonAdminTools', 'CommonOEMLinks', 'CommonPrograms','CommonStartMenu', 'CommonStartup', 'CommonTemplates', 'ComputerFolder', 'ConflictFolder', 'ConnectionsFolder', 'Contacts', 'ControlPanelFolder', 'Cookies', 'Desktop', 'Documents', 'Downloads', 'Favorites', 'Fonts', 'Games', 'GameTasks', 'History', 'InternetCache', 'InternetFolder', 'Links', 'LocalAppData', 'LocalAppDataLow', 'LocalizedResourcesDir', 'Music', 'NetHood', 'NetworkFolder', 'OriginalImages', 'PhotoAlbums', 'Pictures', 'Playlists', 'PrintersFolder', 'PrintHood', 'Profile', 'ProgramData', 'ProgramFiles', 'ProgramFilesX64', 'ProgramFilesX86', 'ProgramFilesCommon', 'ProgramFilesCommonX64', 'ProgramFilesCommonX86', 'Programs', 'Public', 'PublicDesktop', 'PublicDocuments', 'PublicDownloads', 'PublicGameTasks', 'PublicMusic', 'PublicPictures', 'PublicVideos', 'QuickLaunch', 'Recent', 'RecycleBinFolder', 'ResourceDir', 'RoamingAppData', 'SampleMusic', 'SamplePictures', 'SamplePlaylists', 'SampleVideos', 'SavedGames', 'SavedSearches', 'SEARCH_CSC', 'SEARCH_MAPI', 'SearchHome', 'SendTo', 'SidebarDefaultParts', 'SidebarParts', 'StartMenu', 'Startup', 'SyncManagerFolder', 'SyncResultsFolder', 'SyncSetupFolder', 'System', 'SystemX86', 'Templates', 'TreeProperties', 'UserProfiles', 'UsersFiles', 'Videos', 'Windows'
 #targetPath                       ==> you can choose a subfolder (or subfolder path) to redirect to in the targetted location, you can use any Powershell variable here as wells
@@ -627,3 +636,5 @@ foreach($symLink in $listOfOtherFoldersToRedirect){
         Write-Output "Failed to redirect $($symLink.originalLocation) to $targetPath"
     }
 }
+
+Write-Output "Scrip completed"

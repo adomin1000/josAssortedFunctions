@@ -581,7 +581,7 @@ $userEmail = $Null
     $expectedPath = "$($odAccount.Name)\Tenants\$companyName".Replace("HKEY_CURRENT_USER","HKCU:")
     if(Test-Path $expectedPath){
         #now check if the current library is already syncing
-        foreach($value in (Get-Item $expectedPath).GetValueNames()){
+        foreach($value in (Get-Item $expectedPath -ErrorAction SilentlyContinue).GetValueNames()){
             if($value -like "*$($library.title) - *"){
                 Write-Output "$($library.title) is already syncing, skipping :)"
                 continue libraries
@@ -600,7 +600,17 @@ $userEmail = $Null
 
     #send ODOPEN command
     start "odopen://sync/?$($library.syncUrl)&userEmail=$([System.Web.HttpUtility]::UrlEncode($userEmail))&webtitle=$([System.Web.HttpUtility]::UrlEncode($library.title))"
-    Sleep -s 1
+
+    #wait for it to start syncing
+    while($true){
+        if(Test-Path "$($Env:USERPROFILE)\$companyName\$($library.title) - *"){
+            Write-Output "Detected existence of $($library.title)"
+            break
+        }else{
+            Write-Output "Waiting for $($library.title) to get connected..."
+            Sleep -s 1
+        }
+    }
 }
 
 #everything has been mounted, time to process Folder Redirections

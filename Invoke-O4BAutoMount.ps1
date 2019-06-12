@@ -360,9 +360,7 @@ if($runningAsSystem){
     $regPath = "HKLM:\Software\Microsoft\IntuneManagementExtension\Policies\$($scriptPath.Substring($scriptPath.LastIndexOf("_")-36,36))\$($scriptPath.Substring($scriptPath.LastIndexOf("_")+1,36))"
     
     #start a seperate process to remove registry key periodically for this script so IME thinks it never ran
-    if($autoRerunMinutes -gt 0){
-        start-process "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList "`$slept = 0;while(`$true){`$slept += 1;if(`$slept -gt $autoRerunMinutes){`$slept=0;Remove-Item $regPath -Force -Confirm:`$False -ErrorAction SilentlyContinue;Restart-Service -Name IntuneManagementExtension -Force;};Start-Sleep -s 60;}"    
-    }
+    start-process "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList "`$slept = 0;`$script:shuttingDown = `$false;`$sysevent = [microsoft.win32.systemevents];Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnding`" -Action {`$script:shuttingDown = `$true;};Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnded`"  -Action {`$script:shuttingDown = `$true;};while(`$true){;`$slept += 0.5;if((`$slept -gt ($autoRerunMinutes*60) -and $autoRerunMinutes -ne 0) -or `$script:shuttingDown){;`$slept=0;Remove-Item $regPath -Force -Confirm:`$False -ErrorAction SilentlyContinue;Restart-Service -Name IntuneManagementExtension -Force;};Start-Sleep -m 500;};"    
     
     #set removal key in case computer crashes or something like that
     New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name $(Get-Random) -Value "reg delete $regPath /f" -PropertyType String -Force -ErrorAction SilentlyContinue

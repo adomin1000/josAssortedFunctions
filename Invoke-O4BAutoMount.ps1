@@ -596,17 +596,21 @@ $userEmail = $Null
         Write-Output "First time syncing $($library.title), creating link..."
     }
 
-    #send ODOPEN command
-    start "odopen://sync/?$($library.syncUrl)&userEmail=$([System.Web.HttpUtility]::UrlEncode($userEmail))&webtitle=$([System.Web.HttpUtility]::UrlEncode($library.title))"
-
     #wait for it to start syncing
+    $slept = 10
     while($true){
         if(Test-Path "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($library.title)) - *"){
             Write-Output "Detected existence of $($library.title)"
             break
         }else{
             Write-Output "Waiting for $($library.title) to get connected..."
+            if($slept % 10 -eq 0){    
+                #send ODOPEN command
+                Write-Output "Sending ODOpen command..."
+                start "odopen://sync/?$($library.syncUrl)&userEmail=$([System.Web.HttpUtility]::UrlEncode($userEmail))&webtitle=$([System.Web.HttpUtility]::UrlEncode($library.title))"
+            }
             Sleep -s 1
+            $slept += 1
         }
     }
 }

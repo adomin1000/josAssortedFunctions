@@ -34,10 +34,12 @@ $listOfLibrariesToAutoMount = @()
 #setEnvironmentVariable           ==> Set to $True if you want the script to register a %ENV% type variable with Windows to point to the new location. knowFolderInternalName will be the name of the variable (e.g. Desktop would become %desktop%)
 #targetLocation                   ==> Set to "onedrive" or to the title of the teams site you want to map to
 
+try{$upn = $(whoami /upn)}catch{}
+
 $listOfFoldersToRedirect = @(
     @{"knownFolderInternalName" = "Desktop"; "knownFolderInternalIdentifier" = "Desktop"; "targetPath" = "\Desktop"; "targetLocation" = "onedrive"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True},
     @{"knownFolderInternalName" = "MyDocuments"; "knownFolderInternalIdentifier" = "Documents"; "targetPath" = "\My Documents"; "targetLocation" = "onedrive"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True},
-    @{"knownFolderInternalName" = "MyPictures"; "knownFolderInternalIdentifier" = "Pictures"; "targetPath" = "\$(whoami /upn)\All team pictures"; "targetLocation" = "AutoMapTestTeam"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True}#note that the last entry does NOT end with a comma
+    @{"knownFolderInternalName" = "MyPictures"; "knownFolderInternalIdentifier" = "Pictures"; "targetPath" = "\$upn\All team pictures"; "targetLocation" = "AutoMapTestTeam"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True}#note that the last entry does NOT end with a comma
 )
 
 #The following folders will be redirected using hard junctions. Use these to include specifc appdata subfolders into roaming locations or for folders that can't be redirected with the previous method. If paths don't exist, they will be automatically created
@@ -533,7 +535,7 @@ Function Redirect-SpecialFolder {
 #Wait until Onedrive client is running, and has been running for at least 5 seconds
 while($true){
     try{
-        $o4bProcessInfo = @(get-process -name "onedrive")[0]
+        $o4bProcessInfo = @(get-process -name "onedrive" -ErrorAction SilentlyContinue)[0]
         if((New-TimeSpan -Start $o4bProcessInfo.StartTime -End (Get-Date)).TotalSeconds -gt 5){
             Write-Output "Detected a running instance of Onedrive"
             break

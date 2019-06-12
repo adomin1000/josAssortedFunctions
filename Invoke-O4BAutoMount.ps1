@@ -580,7 +580,7 @@ $userEmail = $Null
     if(Test-Path $expectedPath){
         #now check if the current library is already syncing
         foreach($value in (Get-Item $expectedPath -ErrorAction SilentlyContinue).GetValueNames()){
-            if($value -like "*$($library.title) - *"){
+            if($value -like "*$([System.Web.HttpUtility]::UrlEncode($library.title)) - *"){
                 Write-Output "$($library.title) is already syncing, skipping :)"
                 continue libraries
             }
@@ -589,9 +589,9 @@ $userEmail = $Null
     
     #no library is syncing yet, or at least not the one we want
     #first, delete any existing content (this can happen if the user has manually deleted the sync relationship
-    if(test-path "$($Env:USERPROFILE)\$companyName\$($library.title) - *"){
+    if(test-path "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($library.title)) - *"){
         Write-Output "User has removed sync relationship for $($library.title), removing existing content and recreating..."
-        Remove-Item  "$($Env:USERPROFILE)\$companyName\$($library.title) - *" -Force -Confirm:$False -Recurse
+        Remove-Item  "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($library.title)) - *" -Force -Confirm:$False -Recurse
     }else{
         Write-Output "First time syncing $($library.title), creating link..."
     }
@@ -601,7 +601,7 @@ $userEmail = $Null
 
     #wait for it to start syncing
     while($true){
-        if(Test-Path "$($Env:USERPROFILE)\$companyName\$($library.title) - *"){
+        if(Test-Path "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($library.title)) - *"){
             Write-Output "Detected existence of $($library.title)"
             break
         }else{
@@ -617,7 +617,7 @@ foreach($redirection in $listOfFoldersToRedirect){
     if($redirection.targetLocation -eq "onedrive"){
         $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath $redirection.targetPath
     }else{
-        $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$($redirection.targetLocation) - *").FullName -ChildPath $redirection.targetPath
+        $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($redirection.targetLocation)) - *").FullName -ChildPath $redirection.targetPath
     }
     Write-Output "Redirecting $($redirection.knownFolderInternalName) to $targetPath"
     try{
@@ -634,7 +634,7 @@ foreach($symLink in $listOfOtherFoldersToRedirect){
     if($symLink.targetLocation -eq "onedrive"){
         $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath $symLink.targetPath   
     }else{
-        $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$($symLink.targetLocation) - *").FullName -ChildPath $symLink.targetPath
+        $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($symLink.targetLocation)) - *").FullName -ChildPath $symLink.targetPath
     }
     Write-Output "Redirecting $($symLink.originalLocation) to $targetPath"
     try{

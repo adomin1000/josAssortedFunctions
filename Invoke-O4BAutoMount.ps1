@@ -532,16 +532,16 @@ Function Redirect-SpecialFolder {
 
 [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Web")
 
-#Wait until Onedrive client is running, and has been running for at least 5 seconds
+#Wait until Onedrive client is running, and has been running for at least 3 seconds
 while($true){
     try{
         $o4bProcessInfo = @(get-process -name "onedrive" -ErrorAction SilentlyContinue)[0]
-        if((New-TimeSpan -Start $o4bProcessInfo.StartTime -End (Get-Date)).TotalSeconds -gt 5){
+        if($o4bProcessInfo -and (New-TimeSpan -Start $o4bProcessInfo.StartTime -End (Get-Date)).TotalSeconds -gt 3){
             Write-Output "Detected a running instance of Onedrive"
             break
         }else{
-            Sleep -s 1
-            Throw
+            Write-Output "Onedrive client not yet running..."
+            Sleep -s 3
         }
     }catch{
         Write-Output "Onedrive client not yet running..."
@@ -554,25 +554,27 @@ $companyName = $Null
 $userEmail = $Null
 :accounts while($true){
     #check if the Accounts key exists (Onedrive creates this)
-    if(Test-Path HKCU:\Software\Microsoft\OneDrive\Accounts){
-        #look for a Business key with our configured tenant ID that is properly filled out
-        foreach($account in @(Get-ChildItem HKCU:\Software\Microsoft\OneDrive\Accounts)){
-            if($account.GetValue("Business") -eq 1 -and $account.GetValue("ConfiguredTenantId") -eq $tenantId){
-                Write-Output "Detected $($account.GetValue("UserName")), linked to tenant $($account.GetValue("DisplayName")) ($($tenantId))"
-                if(Test-Path $account.GetValue("UserFolder")){
-                    $odAccount = $account
-                    Write-Output "Folder located in $($odAccount.GetValue("UserFolder"))"
-                    $companyName = $account.GetValue("DisplayName")
-                    $userEmail = $account.GetValue("UserEmail")
-                    break accounts
-                }else{
-                    Write-Output "But no user folder detected yet (UserFolder key is empty)"
+    try{
+        if(Test-Path HKCU:\Software\Microsoft\OneDrive\Accounts){
+            #look for a Business key with our configured tenant ID that is properly filled out
+            foreach($account in @(Get-ChildItem HKCU:\Software\Microsoft\OneDrive\Accounts)){
+                if($account.GetValue("Business") -eq 1 -and $account.GetValue("ConfiguredTenantId") -eq $tenantId){
+                    Write-Output "Detected $($account.GetValue("UserName")), linked to tenant $($account.GetValue("DisplayName")) ($($tenantId))"
+                    if(Test-Path $account.GetValue("UserFolder")){
+                        $odAccount = $account
+                        Write-Output "Folder located in $($odAccount.GetValue("UserFolder"))"
+                        $companyName = $account.GetValue("DisplayName")
+                        $userEmail = $account.GetValue("UserEmail")
+                        break accounts
+                    }else{
+                        Write-Output "But no user folder detected yet (UserFolder key is empty)"
+                    }
                 }
-            }
-        }             
-    }
+            }             
+        }
+    }catch{$Null}
     Write-Output "Onedrive not yet fully configured for this user..."
-    Sleep -s 1
+    Sleep -s 2
 }
 
 #now check for any sharepoint/teams libraries we have to link:

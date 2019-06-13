@@ -17,9 +17,9 @@ $tenantId = "36c42d4f-475f-4877-84bb-a2abb69ed283" #you can use https://gitlab.c
 
 #The following Sharepoint and/or Teams libraries will be automatically synced by your user's Onedrive
 #title        ==> The display name, don't change this later or the folder will be synced twice
-#syncUrl      ==> the ODOpen URL 
+#syncUrl      ==> the ODOpen URL, get it with Edge or Chrome when clicking on the Sync button of your library. DO NOT USE INTERNET EXPLORER!
 $listOfLibrariesToAutoMount = @(
-    @{"title" = "AutoMapTestTeam";"syncUrl" = "tenantId=36c42d4f%2D475f%2D4877%2D84bb%2Da2abb69ed283&siteId=%7B80e20d93%2D3830%2D4886%2D86a3%2Dc5b4b773fb8d%7D&webId=%7B49e5a630%2D5c42%2D42ae%2D9042%2D8ea64029c135%7D&listId=%7BED3B83ED%2D396F%2D4535%2DB35C%2DCFB9690945FA%7D&folderId=7d0fed8a%2Decf8%2D4733%2D9f05%2D40b2d87e40cd&webUrl=https%3A%2F%2Fonedrivemapper%2Esharepoint%2Ecom%2Fsites%2FAutoMapTestTeam&version=1"}
+    @{"siteTitle" = "AutoMapTestTeam";"listTitle"="Documents";"syncUrl" = "tenantId=36c42d4f%2D475f%2D4877%2D84bb%2Da2abb69ed283&siteId=%7B80e20d93%2D3830%2D4886%2D86a3%2Dc5b4b773fb8d%7D&webId=%7B49e5a630%2D5c42%2D42ae%2D9042%2D8ea64029c135%7D&listId=%7BED3B83ED%2D396F%2D4535%2DB35C%2DCFB9690945FA%7D&folderId=7d0fed8a%2Decf8%2D4733%2D9f05%2D40b2d87e40cd&webUrl=https%3A%2F%2Fonedrivemapper%2Esharepoint%2Ecom%2Fsites%2FAutoMapTestTeam&version=1"}
 )
 
 <#example config if you only want to sync Onedrive
@@ -32,14 +32,14 @@ $listOfLibrariesToAutoMount = @()
 #targetPath                       ==> you can choose a subfolder (or subfolder path) to redirect to in the targetted location, you can use any Powershell variable here as wells
 #copyExistingFiles                ==> Set to $True if you want the script to try to copy any existing files that are found when redirecting
 #setEnvironmentVariable           ==> Set to $True if you want the script to register a %ENV% type variable with Windows to point to the new location. knowFolderInternalName will be the name of the variable (e.g. Desktop would become %desktop%)
-#targetLocation                   ==> Set to "onedrive" or to the title of the teams site you want to map to
+#targetLocation                   ==> Set to "onedrive" or to the INDEX of the library you wish to redirect to (ie, the first entry of listOfLibrariesToAutoMount would be 0)
 
 try{$upn = $(whoami /upn)}catch{}
 
 $listOfFoldersToRedirect = @(
     @{"knownFolderInternalName" = "Desktop"; "knownFolderInternalIdentifier" = "Desktop"; "targetPath" = "\Desktop"; "targetLocation" = "onedrive"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True},
     @{"knownFolderInternalName" = "MyDocuments"; "knownFolderInternalIdentifier" = "Documents"; "targetPath" = "\My Documents"; "targetLocation" = "onedrive"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True},
-    @{"knownFolderInternalName" = "MyPictures"; "knownFolderInternalIdentifier" = "Pictures"; "targetPath" = "\$upn\All team pictures"; "targetLocation" = "AutoMapTestTeam"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True}#note that the last entry does NOT end with a comma
+    @{"knownFolderInternalName" = "MyPictures"; "knownFolderInternalIdentifier" = "Pictures"; "targetPath" = "\$upn\All team pictures"; "targetLocation" = "0"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True}#note that the last entry does NOT end with a comma
 )
 
 #The following folders will be redirected using hard junctions. Use these to include specifc appdata subfolders into roaming locations or for folders that can't be redirected with the previous method. If paths don't exist, they will be automatically created
@@ -580,12 +580,13 @@ $userEmail = $Null
 #now check for any sharepoint/teams libraries we have to link:
 :libraries foreach($library in $listOfLibrariesToAutoMount){
     #First check if any non-OD4B libraries are configured already
+    $compositeTitle = "$([System.Web.HttpUtility]::UrlEncode($library.siteTitle)) - $([System.Web.HttpUtility]::UrlEncode($library.listTitle))"
     $expectedPath = "$($odAccount.Name)\Tenants\$companyName".Replace("HKEY_CURRENT_USER","HKCU:")
     if(Test-Path $expectedPath){
         #now check if the current library is already syncing
         foreach($value in (Get-Item $expectedPath -ErrorAction SilentlyContinue).GetValueNames()){
-            if($value -like "*$([System.Web.HttpUtility]::UrlEncode($library.title)) - *"){
-                Write-Output "$($library.title) is already syncing, skipping :)"
+            if($value -like "*$compositeTitle"){
+                Write-Output "$compositeTitle is already syncing, skipping :)"
                 continue libraries
             }
         }
@@ -593,25 +594,25 @@ $userEmail = $Null
     
     #no library is syncing yet, or at least not the one we want
     #first, delete any existing content (this can happen if the user has manually deleted the sync relationship
-    if(test-path "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($library.title)) - *"){
-        Write-Output "User has removed sync relationship for $($library.title), removing existing content and recreating..."
-        Remove-Item  "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($library.title)) - *" -Force -Confirm:$False -Recurse
+    if(test-path "$($Env:USERPROFILE)\$companyName\$compositeTitle"){
+        Write-Output "User has removed sync relationship for $compositeTitle, removing existing content and recreating..."
+        Remove-Item  "$($Env:USERPROFILE)\$companyName\$compositeTitle" -Force -Confirm:$False -Recurse
     }else{
-        Write-Output "First time syncing $($library.title), creating link..."
+        Write-Output "First time syncing$compositeTitle, creating link..."
     }
 
     #wait for it to start syncing
     $slept = 10
     while($true){
-        if(Test-Path "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($library.title)) - *"){
-            Write-Output "Detected existence of $($library.title)"
+        if(Test-Path "$($Env:USERPROFILE)\$companyName\$compositeTitle"){
+            Write-Output "Detected existence of $compositeTitle"
             break
         }else{
-            Write-Output "Waiting for $($library.title) to get connected..."
+            Write-Output "Waiting for $compositeTitle to get connected..."
             if($slept % 10 -eq 0){    
                 #send ODOPEN command
                 Write-Output "Sending ODOpen command..."
-                start "odopen://sync/?$($library.syncUrl)&userEmail=$([System.Web.HttpUtility]::UrlEncode($userEmail))&webtitle=$([System.Web.HttpUtility]::UrlEncode($library.title))"
+                start "odopen://sync/?$($library.syncUrl)&userEmail=$([System.Web.HttpUtility]::UrlEncode($userEmail))&webtitle=$([System.Web.HttpUtility]::UrlEncode($library.siteTitle))&listTitle=$([System.Web.HttpUtility]::UrlEncode($library.listTitle))"
             }
             Sleep -s 1
             $slept += 1
@@ -625,7 +626,9 @@ foreach($redirection in $listOfFoldersToRedirect){
     if($redirection.targetLocation -eq "onedrive"){
         $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath $redirection.targetPath
     }else{
-        $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($redirection.targetLocation)) - *").FullName -ChildPath $redirection.targetPath
+        $libraryInfo = $listOfLibrariesToAutoMount[$([Int]$redirection.targetLocation)]
+        $compositeTitle = "$([System.Web.HttpUtility]::UrlEncode($libraryInfo.siteTitle)) - $([System.Web.HttpUtility]::UrlEncode($libraryInfo.listTitle))"
+        $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$compositeTitle").FullName -ChildPath $redirection.targetPath
     }
     Write-Output "Redirecting $($redirection.knownFolderInternalName) to $targetPath"
     try{
@@ -642,7 +645,9 @@ foreach($symLink in $listOfOtherFoldersToRedirect){
     if($symLink.targetLocation -eq "onedrive"){
         $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath $symLink.targetPath   
     }else{
-        $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$([System.Web.HttpUtility]::UrlEncode($symLink.targetLocation)) - *").FullName -ChildPath $symLink.targetPath
+        $libraryInfo = $listOfLibrariesToAutoMount[$([Int]$symLink.targetLocation)]
+        $compositeTitle = "$([System.Web.HttpUtility]::UrlEncode($libraryInfo.siteTitle)) - $([System.Web.HttpUtility]::UrlEncode($libraryInfo.listTitle))"
+        $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$compositeTitle").FullName -ChildPath $symLink.targetPath
     }
     Write-Output "Redirecting $($symLink.originalLocation) to $targetPath"
     try{

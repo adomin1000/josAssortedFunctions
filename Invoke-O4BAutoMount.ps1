@@ -13,6 +13,7 @@
 #important: any source data in folders you redirect could be lost if for some reason the script cannot copy the content OR if you set copyExistingFiles to $False
 
 $autoRerunMinutes = 0 #If set to 0, only runs at logon, else, runs every X minutes AND at logon, expect random delays of up to 5 minutes due to bandwidth, service availability, local resources etc
+$visibleToUser = $False #if set to true, user will see 
 $tenantId = "36c42d4f-475f-4877-84bb-a2abb69ed283" #you can use https://gitlab.com/Lieben/assortedFunctions/blob/master/get-tenantIdFromLogin.ps1 to get your tenant ID
 
 #The following Sharepoint and/or Teams libraries will be automatically synced by your user's Onedrive
@@ -34,7 +35,7 @@ $listOfLibrariesToAutoMount = @()
 #setEnvironmentVariable           ==> Set to $True if you want the script to register a %ENV% type variable with Windows to point to the new location. knowFolderInternalName will be the name of the variable (e.g. Desktop would become %desktop%)
 #targetLocation                   ==> Set to "onedrive" or to the INDEX of the library you wish to redirect to (ie, the first entry of listOfLibrariesToAutoMount would be 0)
 
-try{$upn = $(whoami /upn)}catch{}
+if(!$Env:USERPROFILE.EndsWith("system32\config\systemprofile")){$upn = $(whoami /upn)}
 
 $listOfFoldersToRedirect = @(
     @{"knownFolderInternalName" = "Desktop"; "knownFolderInternalIdentifier" = "Desktop"; "targetPath" = "\Desktop"; "targetLocation" = "onedrive"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True},
@@ -237,7 +238,7 @@ namespace murrayju
         #endregion
 
         // Gets the user token from the currently active session
-        private static bool GetSessionUserToken(ref IntPtr phUserToken)
+        private static bool GetSessionUserToken(ref IntPtr phUserToken, int targetSessionId)
         {
             var bResult = false;
             var hImpersonationToken = IntPtr.Zero;
@@ -256,7 +257,7 @@ namespace murrayju
                     var si = (WTS_SESSION_INFO)Marshal.PtrToStructure((IntPtr)current, typeof(WTS_SESSION_INFO));
                     current += arrayElementSize;
 
-                    if (si.State == WTS_CONNECTSTATE_CLASS.WTSActive)
+                    if (si.State == WTS_CONNECTSTATE_CLASS.WTSActive && si.SessionID == targetSessionId)
                     {
                         activeSessionId = si.SessionID;
                     }
@@ -282,7 +283,7 @@ namespace murrayju
             return bResult;
         }
 
-        public static PROCESS_INFORMATION StartProcessAsCurrentUser(string appPath, string cmdLine = null, string workDir = null, bool visible = true)
+        public static PROCESS_INFORMATION StartProcessAsCurrentUser(int targetSessionId, string appPath, string cmdLine = null, bool visible = true)
         {
             var hUserToken = IntPtr.Zero;
             var startInfo = new STARTUPINFO();
@@ -295,9 +296,9 @@ namespace murrayju
 
             try
             {
-                if (!GetSessionUserToken(ref hUserToken))
+                if (!GetSessionUserToken(ref hUserToken, targetSessionId))
                 {
-                    throw new Exception("StartProcessAsCurrentUser: GetSessionUserToken failed.");
+                    throw new Exception("StartProcessAsCurrentUser: GetSessionUserToken for session "+targetSessionId+" failed.");
                 }
 
                 uint dwCreationFlags = CREATE_UNICODE_ENVIRONMENT | (uint)(visible ? CREATE_NEW_CONSOLE : CREATE_NO_WINDOW);
@@ -317,12 +318,12 @@ namespace murrayju
                     false,
                     dwCreationFlags,
                     pEnv,
-                    workDir, // Working directory
+                    null, // Working directory
                     ref startInfo,
                     out procInfo))
                 {
                     iResultOfCreateProcessAsUser = Marshal.GetLastWin32Error();
-                    throw new Exception("StartProcessAsCurrentUser: CreateProcessAsUser failed.  Error Code -" + iResultOfCreateProcessAsUser);
+                    throw new Exception("StartProcessAsCurrentUser: CreateProcessAsUser failed.  Error Code " + iResultOfCreateProcessAsUser);
                 }
                 procInfoRes = procInfo;
                 iResultOfCreateProcessAsUser = Marshal.GetLastWin32Error();
@@ -349,14 +350,23 @@ namespace murrayju
 $scriptPath = $PSCommandPath
 
 if($runningAsSystem){
-    Write-Output "Running in system context, script should be running in user context, auto-impersonating..."
+    Write-Output "Running in system context, script should be running in user context, we should auto impersonate"
+
+    #get targeted user session ID from intune management log as there is no easy way to translate the user Azure AD to the local user
+    $logLocation = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\IntuneManagementExtension.log"
+    $targetUserSessionId = (Select-String -Pattern "$($scriptPath.Substring($scriptPath.LastIndexOf("_")-36,36)) in session (\d+)]" $logLocation | Select-Object -Last 1).Matches[0].Groups[1].Value
+    
     $compilerParameters = New-Object System.CodeDom.Compiler.CompilerParameters
     $compilerParameters.CompilerOptions="/unsafe"
     $compilerParameters.GenerateInMemory = $True
     Add-Type -TypeDefinition $source -Language CSharp -CompilerParameters $compilerParameters
     
-    $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser("c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Hidden -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"")
-    
+    if($visibleToUser){
+        $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser($targetUserSessionId, "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Normal -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"",$True)
+    }else{
+        $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser($targetUserSessionId, "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Hidden -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"",$False)
+    } 
+
     Sleep -s 1
 
     #get new process info, we could use this in a future version to await completion

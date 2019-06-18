@@ -42,6 +42,10 @@ $listOfFoldersToRedirect = @(
     @{"knownFolderInternalName" = "MyPictures"; "knownFolderInternalIdentifier" = "Pictures"; "targetPath" = "\$upn\All team pictures"; "targetLocation" = "0"; "copyExistingFiles" = $True; "setEnvironmentVariable" = $True}#note that the last entry does NOT end with a comma
 )
 
+<#Example without any redirection:
+$listOfFoldersToRedirect = @()
+#>
+
 #The following folders will be redirected using hard junctions. Use these to include specifc appdata subfolders into roaming locations or for folders that can't be redirected with the previous method. If paths don't exist, they will be automatically created
 #originalLocation   ==> you can use variables or hardcoded paths here, this location will be redirected using a hard link, any existing content will be removed (but first copied if you set copyExistingFiles)
 #targetPath         ==> you can choose a subfolder (or subfolder path) to redirect to in the targetted location

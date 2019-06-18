@@ -185,7 +185,7 @@ namespace murrayju
         #endregion
 
         // Gets the user token from the currently active session
-        private static bool GetSessionUserToken(ref IntPtr phUserToken)
+        private static bool GetSessionUserToken(ref IntPtr phUserToken, int targetSessionId)
         {
             var bResult = false;
             var hImpersonationToken = IntPtr.Zero;
@@ -204,7 +204,7 @@ namespace murrayju
                     var si = (WTS_SESSION_INFO)Marshal.PtrToStructure((IntPtr)current, typeof(WTS_SESSION_INFO));
                     current += arrayElementSize;
 
-                    if (si.State == WTS_CONNECTSTATE_CLASS.WTSActive)
+                    if (si.State == WTS_CONNECTSTATE_CLASS.WTSActive && si.SessionID == targetSessionId)
                     {
                         activeSessionId = si.SessionID;
                     }
@@ -230,7 +230,7 @@ namespace murrayju
             return bResult;
         }
 
-        public static PROCESS_INFORMATION StartProcessAsCurrentUser(string appPath, string cmdLine = null, string workDir = null, bool visible = true)
+        public static PROCESS_INFORMATION StartProcessAsCurrentUser(int targetSessionId, string appPath, string cmdLine = null, bool visible = true)
         {
             var hUserToken = IntPtr.Zero;
             var startInfo = new STARTUPINFO();
@@ -243,9 +243,9 @@ namespace murrayju
 
             try
             {
-                if (!GetSessionUserToken(ref hUserToken))
+                if (!GetSessionUserToken(ref hUserToken, targetSessionId))
                 {
-                    throw new Exception("StartProcessAsCurrentUser: GetSessionUserToken failed.");
+                    throw new Exception("StartProcessAsCurrentUser: GetSessionUserToken for session "+targetSessionId+" failed.");
                 }
 
                 uint dwCreationFlags = CREATE_UNICODE_ENVIRONMENT | (uint)(visible ? CREATE_NEW_CONSOLE : CREATE_NO_WINDOW);
@@ -265,12 +265,12 @@ namespace murrayju
                     false,
                     dwCreationFlags,
                     pEnv,
-                    workDir, // Working directory
+                    null, // Working directory
                     ref startInfo,
                     out procInfo))
                 {
                     iResultOfCreateProcessAsUser = Marshal.GetLastWin32Error();
-                    throw new Exception("StartProcessAsCurrentUser: CreateProcessAsUser failed.  Error Code -" + iResultOfCreateProcessAsUser);
+                    throw new Exception("StartProcessAsCurrentUser: CreateProcessAsUser failed.  Error Code " + iResultOfCreateProcessAsUser);
                 }
                 procInfoRes = procInfo;
                 iResultOfCreateProcessAsUser = Marshal.GetLastWin32Error();
@@ -297,16 +297,23 @@ namespace murrayju
 $scriptPath = $PSCommandPath
 
 if($runningAsSystem){
-    Write-Output "Running in system context, script should be running in user context, auto-impersonating..."
+    Write-Output "Running in system context, script should be running in user context, we should auto impersonate"
+    #Generate registry removal path
+    $regPath = "HKLM:\Software\Microsoft\IntuneManagementExtension\Policies\$($scriptPath.Substring($scriptPath.LastIndexOf("_")-36,36))\$($scriptPath.Substring($scriptPath.LastIndexOf("_")+1,36))"
+    
+    #get targeted user session ID from intune management log as there is no easy way to translate the user Azure AD to the local user
+    $logLocation = "C:\ProgramData\Microsoft\IntuneManagementExtension\Logs\IntuneManagementExtension.log"
+    $targetUserSessionId = (Select-String -Pattern "$($scriptPath.Substring($scriptPath.LastIndexOf("_")-36,36)) in session (\d+)]" $logLocation | Select-Object -Last 1).Matches[0].Groups[1].Value
+
     $compilerParameters = New-Object System.CodeDom.Compiler.CompilerParameters
     $compilerParameters.CompilerOptions="/unsafe"
     $compilerParameters.GenerateInMemory = $True
     Add-Type -TypeDefinition $source -Language CSharp -CompilerParameters $compilerParameters
     
     if($visibleToUser){
-        $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser("c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Normal -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"",$True)
+        $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser($targetUserSessionId, "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Normal -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"",$True)
     }else{
-        $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser("c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Hidden -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"",$False)
+        $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser($targetUserSessionId, "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Hidden -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"",$False)
     }
     
     Sleep -s 1
@@ -314,9 +321,6 @@ if($runningAsSystem){
     #get new process info, we could use this in a future version to await completion
     $process = Get-WmiObject Win32_Process -Filter "name = 'powershell.exe'" | where {$_.CommandLine -like "*$scriptPath*"}
 
-    #Generate registry removal path
-    $regPath = "HKLM:\Software\Microsoft\IntuneManagementExtension\Policies\$($scriptPath.Substring($scriptPath.LastIndexOf("_")-36,36))\$($scriptPath.Substring($scriptPath.LastIndexOf("_")+1,36))"
-    
     #start a seperate process as SYSTEM to monitor for user logoff/logon and preferred scheduled reruns
     start-process "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe" -WindowStyle Hidden -ArgumentList "`$slept = 0;`$script:refreshNeeded = `$false;`$sysevent = [microsoft.win32.systemevents];Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnding`" -Action {`$script:refreshNeeded = `$true;};Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnded`"  -Action {`$script:refreshNeeded = `$true;};Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionSwitch`"  -Action {`$script:refreshNeeded = `$true;};while(`$true){;`$slept += 0.5;if((`$slept -gt ($autoRerunMinutes*60) -and $autoRerunMinutes -ne 0) -or `$script:refreshNeeded){;`$slept=0;`$script:refreshNeeded=`$False;Remove-Item $regPath -Force -Confirm:`$False -ErrorAction SilentlyContinue;Restart-Service -Name IntuneManagementExtension -Force;};Start-Sleep -m 500;};"    
     
@@ -328,4 +332,4 @@ if($runningAsSystem){
 
 ##YOUR CODE HERE
 
-ac (Join-Path $Env:temp "test.txt") $(Get-Date) #example code
+ac (Join-Path $Env:temp "test.txt") "$($Env:USERNAME) at $(Get-Date)" #example code

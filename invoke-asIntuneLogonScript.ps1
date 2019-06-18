@@ -303,7 +303,11 @@ if($runningAsSystem){
     $compilerParameters.GenerateInMemory = $True
     Add-Type -TypeDefinition $source -Language CSharp -CompilerParameters $compilerParameters
     
-    $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser("c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Hidden -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"",$visibleToUser)
+    if($visibleToUser){
+        $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser("c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Normal -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"",$True)
+    }else{
+        $res = [murrayju.ProcessExtensions]::StartProcessAsCurrentUser("c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe", " -WindowStyle Hidden -nologo -executionpolicy ByPass -Command `"& '$scriptPath'`"",$False)
+    }
     
     Sleep -s 1
 

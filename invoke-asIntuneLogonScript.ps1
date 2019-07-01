@@ -9,9 +9,11 @@
 #@michael_mardahl for the idea to remove the script from the registry so it automatically reruns
 #@Justin Murray for a .NET example of how to impersonate a logged in user
 
-$autoRerunMinutes = 10 #If set to 0, only runs at logon, else, runs every X minutes AND at logon, expect random delays of up to 5 minutes due to bandwidth, service availability, local resources etc
+$autoRerunMinutes = 60 #If set to 0, only runs at logon, else, runs every X minutes AND at logon, expect random delays of up to 5 minutes due to bandwidth, service availability, local resources etc. I strongly recommend 0 or >60 as input value to avoid being throttled
 $visibleToUser = $False
 
+#Uncomment for debug logs:
+#Start-Transcript -Path (Join-Path $Env:temp -ChildPath "intuneRestarter.log") -Append -Confirm:$False
 if($Env:USERPROFILE.EndsWith("system32\config\systemprofile")){
     $runningAsSystem = $True
     Write-Output "Running as SYSTEM"
@@ -322,7 +324,7 @@ if($runningAsSystem){
     $process = Get-WmiObject Win32_Process -Filter "name = 'powershell.exe'" | where {$_.CommandLine -like "*$scriptPath*"}
 
     #start a seperate process as SYSTEM to monitor for user logoff/logon and preferred scheduled reruns
-    start-process "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe" -WindowStyle Hidden -ArgumentList "`$slept = 0;`$script:refreshNeeded = `$false;`$sysevent = [microsoft.win32.systemevents];Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnding`" -Action {`$script:refreshNeeded = `$true;};Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnded`"  -Action {`$script:refreshNeeded = `$true;};Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionSwitch`"  -Action {`$script:refreshNeeded = `$true;};while(`$true){;`$slept += 0.5;if((`$slept -gt ($autoRerunMinutes*60) -and $autoRerunMinutes -ne 0) -or `$script:refreshNeeded){;`$slept=0;`$script:refreshNeeded=`$False;Remove-Item $regPath -Force -Confirm:`$False -ErrorAction SilentlyContinue;Restart-Service -Name IntuneManagementExtension -Force;};Start-Sleep -m 500;};"    
+    start-process "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe" -WindowStyle Hidden -ArgumentList "Start-Transcript -Path c:\temp\transcript_system.txt -Append -Confirm:`$False;`$slept = 0;`$script:refreshNeeded = `$false;`$sysevent = [microsoft.win32.systemevents];Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnding`" -Action {`$script:refreshNeeded = `$true;};Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnded`"  -Action {`$script:refreshNeeded = `$true;};Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionSwitch`"  -Action {`$script:refreshNeeded = `$true;};while(`$true){;`$slept += 0.5;if((`$slept -gt ($autoRerunMinutes*60) -and $autoRerunMinutes -ne 0) -or `$script:refreshNeeded){;`$slept=0;`$script:refreshNeeded=`$False;Remove-Item $regPath -Force -Confirm:`$False -ErrorAction SilentlyContinue;Restart-Service -Name IntuneManagementExtension -Force;Exit;};Start-Sleep -m 500;};Stop-Transcript"    
     
     #set removal key in case computer crashes or something like that
     New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name $(Get-Random) -Value "reg delete $regPath /f" -PropertyType String -Force -ErrorAction SilentlyContinue
@@ -332,4 +334,7 @@ if($runningAsSystem){
 
 ##YOUR CODE HERE
 
-ac (Join-Path $Env:temp "test.txt") "$($Env:USERNAME) at $(Get-Date)" #example code
+ac (Join-Path "c:\temp" "test.txt") "$($Env:USERNAME) at $(Get-Date)" #example code
+
+##END OF YOUR CODE
+Throw "Bye" #final line needed so intune will not stop rerunning the script

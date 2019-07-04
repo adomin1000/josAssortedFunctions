@@ -50,7 +50,7 @@ $listOfFoldersToRedirect = @()
 #The following folders will be redirected using hard junctions. Use these to include specifc appdata subfolders into roaming locations or for folders that can't be redirected with the previous method. If paths don't exist, they will be automatically created
 #originalLocation   ==> you can use variables or hardcoded paths here, this location will be redirected using a hard link, any existing content will be removed (but first copied if you set copyExistingFiles)
 #targetPath         ==> you can choose a subfolder (or subfolder path) to redirect to in the targetted location
-#targetLocation     ==> set to "onedrive" or to the title of the teams site you want to map to
+#targetLocation     ==> Set to "onedrive" or to the INDEX of the library you wish to redirect to (ie, the first entry of listOfLibrariesToAutoMount would be 0)
 #hide               ==> Set to $True if you don't want this folder to be visible to the user in the target location
 #copyExistingFiles  ==> Set to $True if you want the script to try to copy any existing files that are found when redirecting
 

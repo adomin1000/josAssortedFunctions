@@ -489,7 +489,7 @@ Function Redirect-Folder {
     $Folder = Get-KnownFolderPath -KnownFolder $GetFolder
     If ($Folder -ne $Target) {
         Set-KnownFolderPath -KnownFolder $SetFolder -Path $Target
-        if($copyExistingFiles -and $Folder){
+        if($copyExistingFiles -and $Folder -and (Test-Path $Folder -PathType Container) -and (Test-Path $Target -PathType Container)){
             Get-ChildItem -Path $Folder -ErrorAction Continue | Copy-Item -Destination $Target -Recurse -Container -Force -Confirm:$False -ErrorAction Continue
         }
         Attrib +h $Folder

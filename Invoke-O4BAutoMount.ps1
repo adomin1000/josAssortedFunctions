@@ -594,7 +594,7 @@ $userEmail = $Null
 #now check for any sharepoint/teams libraries we have to link:
 :libraries foreach($library in $listOfLibrariesToAutoMount){
     #First check if any non-OD4B libraries are configured already
-    $compositeTitle = "$([System.Web.HttpUtility]::UrlEncode($library.siteTitle)) - $([System.Web.HttpUtility]::UrlEncode($library.listTitle))"
+    $compositeTitle = "$([uri]::EscapeDataString($library.siteTitle)) - $([uri]::EscapeDataString($library.listTitle))"
     $expectedPath = "$($odAccount.Name)\Tenants\$companyName".Replace("HKEY_CURRENT_USER","HKCU:")
     if(Test-Path $expectedPath){
         #now check if the current library is already syncing
@@ -626,7 +626,7 @@ $userEmail = $Null
             if($slept % 10 -eq 0){    
                 #send ODOPEN command
                 Write-Output "Sending ODOpen command..."
-                start "odopen://sync/?$($library.syncUrl)&userEmail=$([System.Web.HttpUtility]::UrlEncode($userEmail))&webtitle=$([System.Web.HttpUtility]::UrlEncode($library.siteTitle))&listTitle=$([System.Web.HttpUtility]::UrlEncode($library.listTitle))"
+                start "odopen://sync/?$($library.syncUrl)&userEmail=$([uri]::EscapeDataString($userEmail))&webtitle=$([uri]::EscapeDataStringe($library.siteTitle))&listTitle=$([uri]::EscapeDataString($library.listTitle))"
             }
             Sleep -s 1
             $slept += 1
@@ -641,7 +641,7 @@ foreach($redirection in $listOfFoldersToRedirect){
         $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath $redirection.targetPath
     }else{
         $libraryInfo = $listOfLibrariesToAutoMount[$([Int]$redirection.targetLocation)]
-        $compositeTitle = "$([System.Web.HttpUtility]::UrlEncode($libraryInfo.siteTitle)) - $([System.Web.HttpUtility]::UrlEncode($libraryInfo.listTitle))"
+        $compositeTitle = "$([uri]::EscapeDataString($libraryInfo.siteTitle)) - $([uri]::EscapeDataString($libraryInfo.listTitle))"
         $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$compositeTitle").FullName -ChildPath $redirection.targetPath
     }
     Write-Output "Redirecting $($redirection.knownFolderInternalName) to $targetPath"
@@ -660,7 +660,7 @@ foreach($symLink in $listOfOtherFoldersToRedirect){
         $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath $symLink.targetPath   
     }else{
         $libraryInfo = $listOfLibrariesToAutoMount[$([Int]$symLink.targetLocation)]
-        $compositeTitle = "$([System.Web.HttpUtility]::UrlEncode($libraryInfo.siteTitle)) - $([System.Web.HttpUtility]::UrlEncode($libraryInfo.listTitle))"
+        $compositeTitle = "$([uri]::EscapeDataString($libraryInfo.siteTitle)) - $([uri]::EscapeDataString($libraryInfo.listTitle))"
         $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$compositeTitle").FullName -ChildPath $symLink.targetPath
     }
     Write-Output "Redirecting $($symLink.originalLocation) to $targetPath"

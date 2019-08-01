@@ -577,7 +577,7 @@ $userEmail = $Null
                     if(Test-Path $account.GetValue("UserFolder")){
                         $odAccount = $account
                         Write-Output "Folder located in $($odAccount.GetValue("UserFolder"))"
-                        $companyName = $account.GetValue("DisplayName")
+                        $companyName = $account.GetValue("DisplayName").Replace("/"," ")
                         $userEmail = $account.GetValue("UserEmail")
                         break accounts
                     }else{
@@ -612,7 +612,7 @@ $userEmail = $Null
         Write-Output "User has removed sync relationship for $compositeTitle, removing existing content and recreating..."
         Remove-Item  "$($Env:USERPROFILE)\$companyName\$compositeTitle" -Force -Confirm:$False -Recurse
     }else{
-        Write-Output "First time syncing$compositeTitle, creating link..."
+        Write-Output "First time syncing $compositeTitle, creating link..."
     }
 
     #wait for it to start syncing

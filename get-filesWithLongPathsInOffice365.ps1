@@ -32,7 +32,7 @@ Param(
     [Parameter(Mandatory=$true)][String]$tenantName,
     [Switch]$useMFA,
     [Switch]$exportCSV
-)function Load-Module{    Param(        $Name    )    Write-Output "Checking for $Name Module"
+)$adminUrl = "https://$tenantName-admin.sharepoint.com"$baseUrl = "https://$tenantName.sharepoint.com"function Load-Module{    Param(        $Name    )    Write-Output "Checking for $Name Module"
     $module = Get-Module -Name $Name -ListAvailable
     if ($module -eq $null) {
         write-Output "$Name Powershell module not installed...trying to Install, this will fail in an unelevated session"
@@ -54,9 +54,9 @@ Param(
     }
     try{
         Write-Output "loading module"
-        Import-Module $Name -DisableNameChecking -Force -NoClobber        Write-Output "module loaded"    }catch{        Write-Output "failed to load module"    }}Load-Module SharePointPnPPowerShellOnlineif(!$useMFA){    $Credential = Get-Credential}if($useMFA){    Connect-PnPOnline "https://$tenantName-admin.sharepoint.com" -UseWebLogin
+        Import-Module $Name -DisableNameChecking -Force -NoClobber        Write-Output "module loaded"    }catch{        Write-Output "failed to load module"    }}Load-Module SharePointPnPPowerShellOnlineif(!$useMFA){    $Credential = Get-Credential}if($useMFA){    Connect-PnPOnline $adminUrl -UseWebLogin
 }else{
-    Connect-PnPOnline "https://$tenantName-admin.sharepoint.com" -Credentials $Credential
+    Connect-PnPOnline $adminUrl -Credentials $Credential
 }
 
 $reportRows = New-Object System.Collections.ArrayList
@@ -68,28 +68,36 @@ foreach($site in $sites){
     }else{
         Connect-PnPOnline $site.FieldValues.SiteUrl -Credentials $Credential
     }
-    $lists = Get-PnPList -Includes BaseTemplate,EntityTypeName
-    $lists | where {$_.BaseTemplate -eq 101} | % {
-        Write-Output "Detected document library $($_.Title) with Id $($_.Id) and Url $($_.SiteUrl), processing..."
+    $lists = Get-PnPList -Includes BaseType,BaseTemplate,ItemCount
+    $lists | where {$_.BaseTemplate -eq 101 -and $_.ItemCount -gt 0} | % {
+        Write-Output "Detected document library $($_.Title) with Id $($_.Id.Guid) and Url $baseUrl$($_.RootFolder.ServerRelativeUrl), processing..."
         $items = Get-PnPListItem -List $_ -PageSize 2000
         foreach($item in $items){
-            if($item.FileSystemObjectType -eq "Folder"){
-                continue #Mapjes skippen we!
+            $itemName = Split-Path $item.FieldValues.FileRef -Leaf
+            $itemFullUrl = "$baseUrl$($item.FieldValues.FileRef)"
+
+            if($item.FileSystemObjectType -ne "Folder"){
+                $fileType = $item.FieldValues.FileRef.Substring($item.FieldValues.FileRef.LastIndexOf("."))
+                if($fileExtension -and $fileExtension.Length -gt 0 -and !$relative.EndsWith($fileExtension)){
+                    continue #filter by file extension
+                }
+            }else{
+                $fileType = "N/A"
             }
-            $baseUrl = ($site.FieldValues.SiteUrl -Split("/sites"))[0]
-            $relative = $item.FieldValues.FileRef
-            if($fileExtension -and $fileExtension.Length -gt 0 -and !$relative.EndsWith($fileExtension)){
-                continue #filter by file extension
-            }
-            $fullPath = "$($baseUrl)$($relative)"
-            if($fullPath.Length -lt $maxPathLength){
+
+            if($itemFullUrl.Length -lt $maxPathLength){
                 continue #filter by max length
             }
+
             $ObjectProperties = [Ordered]@{
-                "Path Length" = $fullPath.Length
-                "Site URL" = $baseUrl
-                "File" = $item.FieldValues.FileLeafRef
-                "Full Path" = $fullPath
+                "Path Total Length" = $itemFullUrl.Length
+                "Path Parent Length" = $itemFullUrl.Length-$item.FieldValues.FileLeafRef.Length
+                "Path Leaf Length" = $item.FieldValues.FileLeafRef.Length
+                "Site URL" = $site.FieldValues.SiteUrl
+                "Item full URL" = "$baseUrl$($item.FieldValues.FileRef)"
+                "Item Name" = $item.FieldValues.FileLeafRef
+                "Item extension" = $fileType
+                "Item Type" = $item.FileSystemObjectType
             }
             [void]$reportRows.Add((New-Object -TypeName PSObject -Property $ObjectProperties))
         }

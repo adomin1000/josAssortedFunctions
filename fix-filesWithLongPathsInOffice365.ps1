@@ -305,6 +305,7 @@ function doTheSharepointStuff{    Param(        $mode=0       )    try{    
                         continue
                     }elseif($modifiedReportRow.Count -eq 0){
                         write-output "found zero hits in the CSV for $($item.FieldValues.FileRef) with GUID $($item.FieldValues.GUID.Guid)"
+                        continue
                     }else{
                         if((Split-Path $item.FieldValues.FileRef -Leaf) -ne $modifiedReportRow."Item Name"){
                             try{
@@ -382,13 +383,15 @@ function doTheSharepointStuff{    Param(        $mode=0       )    try{    
                     }
                 }
             }
-            if($script:removeFolder){
+            if($script:removeFolder -and $mode -eq 0){
                 $reportRows[$i]."Path Total Length" = $Null
             }
         }    
     }
 
-    $reportRows = $reportRows | where {$_."Path Total Length"}
+    if($mode -eq 0){
+        $reportRows = $reportRows | where {$_."Path Total Length"}
+    }
 
     Write-Progress -Activity "$($siteCount+1)/$($sites.Count)" -Status "Exporting to CSV" -PercentComplete 99
     $reportRows | export-csv -Path $csvPath -Force -NoTypeInformation -Encoding UTF8 -Delimiter ","

@@ -62,7 +62,7 @@ Param(
     [Int]$maxPathLengthNormalFiles=256,
     [Int]$EditorWidth=1200,
     [Int]$EditorHeight=800,
-    [String]$tenantName="liebenconsultancy",
+    [Parameter(Mandatory=$true)][String]$tenantName,
     [Parameter(Mandatory=$true)]$csvPath,
     [String]$specificSiteUrls=$Null,
     [Switch]$useMFA,
@@ -298,7 +298,12 @@ function doTheSharepointStuff{    Param(        $mode=0       )    try{    
                 #Determine if a rename is required for a file/folder
                 if($mode -eq 1){
                     $guid = $item.FieldValues.GUID.Guid
-                    [Array]$modifiedReportRow = @($Script:modifiedReportRows.Results[$Script:modifiedReportRows.FastSearch.$guid])
+                    try{
+                        [Array]$modifiedReportRow = @()
+                        [Array]$modifiedReportRow = @($Script:modifiedReportRows.Results[$Script:modifiedReportRows.FastSearch.$guid])
+                    }catch{
+                        [Array]$modifiedReportRow = @()
+                    }
                     if($modifiedReportRow.Count -gt 1){
                         Write-Error "Error: more than 1 item with the same GUID found in the CSV file with modifications for $($item.FieldValues.FileRef) with GUID $($item.FieldValues.GUID.Guid)" -ErrorAction Continue
                         $importCSVInfo = "Error: more than 1 item with the same GUID found in the CSV file with modifications for $($item.FieldValues.FileRef) with GUID $($item.FieldValues.GUID.Guid)"
@@ -314,6 +319,7 @@ function doTheSharepointStuff{    Param(        $mode=0       )    try{    
                             }catch{
                                 write-output "Error: item was found in CSV, but could not retrieve the item in Sharepoint Online"
                                 $importCSVInfo = "Error: item was found in CSV, but could not retrieve the item in Sharepoint Online"
+                                continue
                             }
                         }
                     }
@@ -433,7 +439,7 @@ while($True){
                 
             #if this is just a file, no need to loop over the whole CSV, only the file had to be renamed
             if($reportRows[$i]."Item Type" -ne "Folder"){
-                Write-Output "Replaced $($reportRows[$i]."Item Name") in $oldUrlToReplace"
+                Write-Output "Replaced $($reportRows[$i]."Item Name") in $oldUrlToReplace in CSV file"
                 Continue
             }   
                                 
@@ -443,7 +449,7 @@ while($True){
             $reportRows | & {
                 process{
                     if($_."Item full URL".StartsWith($oldUrlToReplace) -and $_."Item full URL" -ne $reportRows[$i]."Item full URL"){
-                        Write-Output "Replaced $($reportRows[$i]."Item full URL") in $($reportRows[$j]."Item full URL")"
+                        Write-Output "Replaced $($reportRows[$i]."Item full URL") in $($reportRows[$j]."Item full URL") in CSV file"
                         $reportRows[$j]."Item full URL" = $reportRows[$j]."Item full URL".Replace($oldUrlToReplace,$reportRows[$i]."Item full URL")
                     }
                     $j++

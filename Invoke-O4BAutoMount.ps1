@@ -18,7 +18,7 @@ $tenantId = "36c42d4f-475f-4877-84bb-a2abb69ed283" #you can use https://gitlab.c
 
 #The following Sharepoint and/or Teams libraries will be automatically synced by your user's Onedrive
 #title        ==> The display name, don't change this later or the folder will be synced twice
-#syncUrl      ==> the ODOpen URL, get it with Edge or Chrome when clicking on the Sync button of your library. DO NOT USE INTERNET EXPLORER!
+#syncUrl      ==> the ODOpen URL, get it with Edge or Chrome when clicking on the Sync button of your library. If this does not show an URL, use Internet Explorer
 $listOfLibrariesToAutoMount = @(
     @{"siteTitle" = "AutoMapTestTeam";"listTitle"="Documents";"syncUrl" = "tenantId=36c42d4f%2D475f%2D4877%2D84bb%2Da2abb69ed283&siteId=%7B80e20d93%2D3830%2D4886%2D86a3%2Dc5b4b773fb8d%7D&webId=%7B49e5a630%2D5c42%2D42ae%2D9042%2D8ea64029c135%7D&listId=%7BED3B83ED%2D396F%2D4535%2DB35C%2DCFB9690945FA%7D&folderId=7d0fed8a%2Decf8%2D4733%2D9f05%2D40b2d87e40cd&webUrl=https%3A%2F%2Fonedrivemapper%2Esharepoint%2Ecom%2Fsites%2FAutoMapTestTeam&version=1"}
 )
@@ -71,6 +71,18 @@ if($Env:USERPROFILE.EndsWith("system32\config\systemprofile")){
 }else{
     $runningAsSystem = $False
     Write-Output "Running as $($env:USERNAME)"
+}
+
+#translate any urls that were created with IE
+for($i=0;$i -lt $listOfLibrariesToAutoMount.Count;$i++){
+    if($listOfLibrariesToAutoMount[$i].syncUrl.StartsWith("odopen")){
+        $components = $listOfLibrariesToAutoMount[$i].syncUrl.Split("?")[1].Split("&")
+        $translatedUrl = "tenantId=$tenantId&$($components | where{$_.StartsWith("siteId")})&$($components | where{$_.StartsWith("webId")})&$($components | where{$_.StartsWith("listId")})&$($components | where{$_.StartsWith("webUrl")})"
+        if($($components | where{$_.StartsWith("folderId")}).Length -gt 1){
+            $translatedUrl = "$($translatedUrl)&$($components | where{$_.StartsWith("folderId")})"
+        }
+        $listOfLibrariesToAutoMount[$i].syncUrl = $translatedUrl
+    }
 }
 
 $source=@"
@@ -626,7 +638,7 @@ $userEmail = $Null
             if($slept % 10 -eq 0){    
                 #send ODOPEN command
                 Write-Output "Sending ODOpen command..."
-                start "odopen://sync/?$($library.syncUrl)&userEmail=$([uri]::EscapeDataString($userEmail))&webtitle=$([uri]::EscapeDataStringe($library.siteTitle))&listTitle=$([uri]::EscapeDataString($library.listTitle))"
+                start "odopen://sync/?$($library.syncUrl)&userEmail=$([uri]::EscapeDataString($userEmail))&webtitle=$([uri]::EscapeDataString($library.siteTitle))&listTitle=$([uri]::EscapeDataString($library.listTitle))"
             }
             Sleep -s 1
             $slept += 1

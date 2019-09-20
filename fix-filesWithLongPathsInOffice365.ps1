@@ -67,15 +67,36 @@ Param(
     [String]$specificSiteUrls=$Null,
     [Switch]$useMFA,
     [Switch]$WhatIf
-)if($EditorWidth -le 900){    $EditorWidth = 900}if($EditorHeight -le 500){    $EditorHeight = 500}$adminUrl = "https://$tenantName-admin.sharepoint.com"$baseUrl = "https://$tenantName.sharepoint.com"if($specialFileExtensions.Length -gt 0){
+)
+
+if($EditorWidth -le 900){
+    $EditorWidth = 900
+}
+
+if($EditorHeight -le 500){
+    $EditorHeight = 500
+}
+
+$adminUrl = "https://$tenantName-admin.sharepoint.com"
+$baseUrl = "https://$tenantName.sharepoint.com"
+
+if($specialFileExtensions.Length -gt 0){
     [Array]$specialFileExtensions = $specialFileExtensions.Split(",",[System.StringSplitOptions]::RemoveEmptyEntries)
 }else{
     $specialFileExtensions = $Null
-}if($specificSiteUrls.Length -gt 0){
+}
+
+if($specificSiteUrls.Length -gt 0){
     [Array]$specificSiteUrls = $specificSiteUrls.Split(",",[System.StringSplitOptions]::RemoveEmptyEntries)
 }else{
     [Array]$specificSiteUrls = @()
-}function Load-Module{    Param(        $Name    )    Write-Output "Checking for $Name Module"
+}
+
+function Load-Module{
+    Param(
+        $Name
+    )
+    Write-Output "Checking for $Name Module"
     $module = Get-Module -Name $Name -ListAvailable
     if ($module -eq $null) {
         write-Output "$Name Powershell module not installed...trying to Install, this will fail in an unelevated session"
@@ -97,7 +118,14 @@ Param(
     }
     try{
         Write-Output "loading module"
-        Import-Module $Name -DisableNameChecking -Force -NoClobber        Write-Output "module loaded"    }catch{        Write-Output "failed to load module"    }}function EditCSV { 
+        Import-Module $Name -DisableNameChecking -Force -NoClobber
+        Write-Output "module loaded"
+    }catch{
+        Write-Output "failed to load module"
+    }
+}
+
+function EditCSV { 
     $x = 100
     $y = 100
     $Width = $EditorWidth
@@ -185,7 +213,17 @@ Param(
     $script:dt | export-csv -NoTypeInformation -path $csvPath -Force -Encoding UTF8 -Delimiter ","
 } 
 
-function doTheSharepointStuff{    Param(        $mode=0       )    try{        Load-Module SharePointPnPPowerShellOnline        if(!$useMFA -and !$script:Credential){            $script:Credential = Get-Credential        }        if($useMFA){            Connect-PnPOnline $adminUrl -UseWebLogin
+function doTheSharepointStuff{
+    Param(
+        $mode=0   
+    )
+    try{
+        Load-Module SharePointPnPPowerShellOnline
+        if(!$useMFA -and !$script:Credential){
+            $script:Credential = Get-Credential
+        }
+        if($useMFA){
+            Connect-PnPOnline $adminUrl -UseWebLogin
         }else{
             Connect-PnPOnline $adminUrl -Credentials $Credential
         }
@@ -224,23 +262,54 @@ function doTheSharepointStuff{    Param(        $mode=0       )    try{    
         Write-Output "Running for all Sharepoint, Onedrive and Team sites"
     }
 
+    $allSites = @()
     $sites = @()
+    #intial discovery phase
     Get-PnPListItem -List DO_NOT_DELETE_SPLIST_TENANTADMIN_AGGREGATED_SITECOLLECTIONS -Fields ID,Title,TemplateTitle,SiteUrl,IsGroupConnected | % {
-        if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $_.FieldValues.SiteUrl) -or $specificSiteUrls.Count -eq 0){
-            $sites+=[PSCustomObject]@{"SiteUrl"=$_.FieldValues.SiteUrl;"Title"=$_.FieldValues.Title;}    
-        }
-    }
-
-    foreach($extraSite in (Get-PnPTenantSite -IncludeOneDriveSites | select StorageUsage,Title,Url)){
-        if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $extraSite.Url) -or $specificSiteUrls.Count -eq 0){
-            if($sites.SiteUrl -notcontains $extraSite.Url){
-                $sites+=[PSCustomObject]@{"SiteUrl"=$extraSite.Url;"Title"=$extraSite.Title;} 
+        if($_.FieldValues.SiteUrl.StartsWith("https")){
+            $allSites+=[PSCustomObject]@{"SiteUrl"=$_.FieldValues.SiteUrl;"Title"=$_.FieldValues.Title;}
+            if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $_.FieldValues.SiteUrl) -or $specificSiteUrls.Count -eq 0){
+                $sites+=[PSCustomObject]@{"SiteUrl"=$_.FieldValues.SiteUrl;"Title"=$_.FieldValues.Title;}    
             }
         }
     }
-
+    
+    #secondary discovery phase
+    foreach($extraSite in (Get-PnPTenantSite -IncludeOneDriveSites | select StorageUsage,Title,Url)){
+        if($extraSite.Url.StartsWith("https")){
+            if($allSites.SiteUrl -notcontains $extraSite.Url){
+                $allSites+=[PSCustomObject]@{"SiteUrl"=$extraSite.Url;"Title"=$extraSite.Title;}
+            }
+            if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $extraSite.Url) -or $specificSiteUrls.Count -eq 0){
+                if($sites.SiteUrl -notcontains $extraSite.Url){
+                    $sites+=[PSCustomObject]@{"SiteUrl"=$extraSite.Url;"Title"=$extraSite.Title;} 
+                }
+            }
+        }
+    }
+    
+    #add subsites of any of the discovered sites
+    for($siteCount = 0;$siteCount -lt $allSites.Count;$siteCount++){
+        write-output "Discovering subsites of: $($allSites[$siteCount].SiteUrl)"
+        try{
+            if($useMFA){
+                Connect-PnPOnline $allSites[$siteCount].SiteUrl -UseWebLogin
+            }else{
+                Connect-PnPOnline $allSites[$siteCount].SiteUrl -Credentials $script:Credential
+            }
+            Get-PnPSubWebs -Recurse | % {
+            
+                if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $_.Url) -or $specificSiteUrls.Count -eq 0){
+                    if($sites.SiteUrl -notcontains $_.Url){
+                        $sites+=[PSCustomObject]@{"SiteUrl"=$_.Url;"Title"=$_.Title;} 
+                    }
+                }        
+            }
+        }catch{$Null}
+    }
+    
     $sites = @($sites | where {-not $_.SiteUrl.EndsWith("/")})
-
+    
     if($sites.Count -le 0){
         if($specificSiteUrls.Length -gt 1){
             Throw "No sites matching the specified urls found!"
@@ -253,7 +322,8 @@ function doTheSharepointStuff{    Param(        $mode=0       )    try{    
     for($siteCount = 0;$siteCount -lt $sites.Count;$siteCount++){
         Write-Progress -Activity "$($siteCount+1)/$($sites.Count) site $($sites[$siteCount].SiteUrl)" -Status "Retrieving lists in site..." -PercentComplete 0
         Write-Output "Processing $($sites[$siteCount].Title) with url $($sites[$siteCount].SiteUrl)"
-        if($useMFA){            Connect-PnPOnline $sites[$siteCount].SiteUrl -UseWebLogin
+        if($useMFA){
+            Connect-PnPOnline $sites[$siteCount].SiteUrl -UseWebLogin
         }else{
             Connect-PnPOnline $sites[$siteCount].SiteUrl -Credentials $script:Credential
         }
@@ -508,4 +578,4 @@ while($True){
         Exit
     }
 }
-
+

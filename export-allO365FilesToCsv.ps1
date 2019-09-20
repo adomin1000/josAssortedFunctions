@@ -73,19 +73,47 @@ if($specificSiteUrls.Count -gt 0){
     Write-Output "Running for all Sharepoint, Onedrive and Team sites"
 }
 
+$allSites = @()
 $sites = @()
+#intial discovery phase
 Get-PnPListItem -List DO_NOT_DELETE_SPLIST_TENANTADMIN_AGGREGATED_SITECOLLECTIONS -Fields ID,Title,TemplateTitle,SiteUrl,IsGroupConnected | % {
-    if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $_.FieldValues.SiteUrl) -or $specificSiteUrls.Count -eq 0){
-        $sites+=[PSCustomObject]@{"SiteUrl"=$_.FieldValues.SiteUrl;"Title"=$_.FieldValues.Title;}    
+    if($_.FieldValues.SiteUrl.StartsWith("https")){
+        $allSites+=[PSCustomObject]@{"SiteUrl"=$_.FieldValues.SiteUrl;"Title"=$_.FieldValues.Title;}
+        if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $_.FieldValues.SiteUrl) -or $specificSiteUrls.Count -eq 0){
+            $sites+=[PSCustomObject]@{"SiteUrl"=$_.FieldValues.SiteUrl;"Title"=$_.FieldValues.Title;}    
+        }
     }
 }
 
+#secondary discovery phase
 foreach($extraSite in (Get-PnPTenantSite -IncludeOneDriveSites | select StorageUsage,Title,Url)){
-    if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $extraSite.Url) -or $specificSiteUrls.Count -eq 0){
-        if($sites.SiteUrl -notcontains $extraSite.Url){
-            $sites+=[PSCustomObject]@{"SiteUrl"=$extraSite.Url;"Title"=$extraSite.Title;} 
+    if($extraSite.Url.StartsWith("https")){
+        if($allSites.SiteUrl -notcontains $extraSite.Url){
+            $allSites+=[PSCustomObject]@{"SiteUrl"=$extraSite.Url;"Title"=$extraSite.Title;}
+        }
+        if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $extraSite.Url) -or $specificSiteUrls.Count -eq 0){
+            if($sites.SiteUrl -notcontains $extraSite.Url){
+                $sites+=[PSCustomObject]@{"SiteUrl"=$extraSite.Url;"Title"=$extraSite.Title;} 
+            }
         }
     }
+}
+
+#add subsites of any of the discovered sites
+for($siteCount = 0;$siteCount -lt $allSites.Count;$siteCount++){
+    write-output "Discovering subsites of: $($allSites[$siteCount].SiteUrl)"    try{        if($useMFA){            Connect-PnPOnline $allSites[$siteCount].SiteUrl -UseWebLogin
+        }else{
+            Connect-PnPOnline $allSites[$siteCount].SiteUrl -Credentials $script:Credential
+        }
+        Get-PnPSubWebs -Recurse | % {
+        
+            if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $_.Url) -or $specificSiteUrls.Count -eq 0){
+                if($sites.SiteUrl -notcontains $_.Url){
+                    $sites+=[PSCustomObject]@{"SiteUrl"=$_.Url;"Title"=$_.Title;} 
+                }
+            }        
+        }
+    }catch{$Null}
 }
 
 $sites = @($sites | where {-not $_.SiteUrl.EndsWith("/")})

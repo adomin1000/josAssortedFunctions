@@ -32,11 +32,23 @@ Param(
     [Parameter(Mandatory=$true)]$csvPath,
     [String]$specificSiteUrls=$Null,
     [Switch]$useMFA
-)$adminUrl = "https://$tenantName-admin.sharepoint.com"$baseUrl = "https://$tenantName.sharepoint.com"if($specificSiteUrls.Length -gt 0){
+)
+
+$adminUrl = "https://$tenantName-admin.sharepoint.com"
+
+$baseUrl = "https://$tenantName.sharepoint.com"
+
+if($specificSiteUrls.Length -gt 0){
     [Array]$specificSiteUrls = $specificSiteUrls.Split(",",[System.StringSplitOptions]::RemoveEmptyEntries)
 }else{
     [Array]$specificSiteUrls = @()
-}function Load-Module{    Param(        $Name    )    Write-Output "Checking for $Name Module"
+}
+
+function Load-Module{
+    Param(
+        $Name
+    )
+    Write-Output "Checking for $Name Module"
     $module = Get-Module -Name $Name -ListAvailable
     if ($module -eq $null) {
         write-Output "$Name Powershell module not installed...trying to Install, this will fail in an unelevated session"
@@ -58,7 +70,20 @@ Param(
     }
     try{
         Write-Output "loading module"
-        Import-Module $Name -DisableNameChecking -Force -NoClobber        Write-Output "module loaded"    }catch{        Write-Output "failed to load module"    }}try{    Load-Module SharePointPnPPowerShellOnline    if(!$useMFA -and !$script:Credential){        $script:Credential = Get-Credential    }    if($useMFA){        Connect-PnPOnline $adminUrl -UseWebLogin
+        Import-Module $Name -DisableNameChecking -Force -NoClobber
+        Write-Output "module loaded"
+    }catch{
+        Write-Output "failed to load module"
+    }
+}
+
+try{
+    Load-Module SharePointPnPPowerShellOnline
+    if(!$useMFA -and !$script:Credential){
+        $script:Credential = Get-Credential
+    }
+    if($useMFA){
+        Connect-PnPOnline $adminUrl -UseWebLogin
     }else{
         Connect-PnPOnline $adminUrl -Credentials $Credential
     }
@@ -101,7 +126,10 @@ foreach($extraSite in (Get-PnPTenantSite -IncludeOneDriveSites | select StorageU
 
 #add subsites of any of the discovered sites
 for($siteCount = 0;$siteCount -lt $allSites.Count;$siteCount++){
-    write-output "Discovering subsites of: $($allSites[$siteCount].SiteUrl)"    try{        if($useMFA){            Connect-PnPOnline $allSites[$siteCount].SiteUrl -UseWebLogin
+    write-output "Discovering subsites of: $($allSites[$siteCount].SiteUrl)"
+    try{
+        if($useMFA){
+            Connect-PnPOnline $allSites[$siteCount].SiteUrl -UseWebLogin
         }else{
             Connect-PnPOnline $allSites[$siteCount].SiteUrl -Credentials $script:Credential
         }
@@ -130,7 +158,8 @@ $reportRows = New-Object System.Collections.ArrayList
 for($siteCount = 0;$siteCount -lt $sites.Count;$siteCount++){
     Write-Progress -Activity "$($siteCount+1)/$($sites.Count) site $($sites[$siteCount].SiteUrl)" -Status "Retrieving lists in site..." -PercentComplete 0
     Write-Output "Processing $($sites[$siteCount].Title) with url $($sites[$siteCount].SiteUrl)"
-    if($useMFA){        Connect-PnPOnline $sites[$siteCount].SiteUrl -UseWebLogin
+    if($useMFA){
+        Connect-PnPOnline $sites[$siteCount].SiteUrl -UseWebLogin
     }else{
         Connect-PnPOnline $sites[$siteCount].SiteUrl -Credentials $script:Credential
     }

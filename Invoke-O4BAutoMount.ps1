@@ -606,7 +606,7 @@ $userEmail = $Null
 #now check for any sharepoint/teams libraries we have to link:
 :libraries foreach($library in $listOfLibrariesToAutoMount){
     #First check if any non-OD4B libraries are configured already
-    $compositeTitle = "$([uri]::EscapeDataString($library.siteTitle)) - $([uri]::EscapeDataString($library.listTitle))"
+    $compositeTitle = "$($library.siteTitle) - $($library.listTitle)"
     $expectedPath = "$($odAccount.Name)\Tenants\$companyName".Replace("HKEY_CURRENT_USER","HKCU:")
     if(Test-Path $expectedPath){
         #now check if the current library is already syncing
@@ -653,7 +653,7 @@ foreach($redirection in $listOfFoldersToRedirect){
         $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath $redirection.targetPath
     }else{
         $libraryInfo = $listOfLibrariesToAutoMount[$([Int]$redirection.targetLocation)]
-        $compositeTitle = "$([uri]::EscapeDataString($libraryInfo.siteTitle)) - $([uri]::EscapeDataString($libraryInfo.listTitle))"
+        $compositeTitle = "$($libraryInfo.siteTitle) - $($libraryInfo.listTitle)"
         $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$compositeTitle").FullName -ChildPath $redirection.targetPath
     }
     Write-Output "Redirecting $($redirection.knownFolderInternalName) to $targetPath"
@@ -672,7 +672,7 @@ foreach($symLink in $listOfOtherFoldersToRedirect){
         $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath $symLink.targetPath   
     }else{
         $libraryInfo = $listOfLibrariesToAutoMount[$([Int]$symLink.targetLocation)]
-        $compositeTitle = "$([uri]::EscapeDataString($libraryInfo.siteTitle)) - $([uri]::EscapeDataString($libraryInfo.listTitle))"
+        $compositeTitle = "$($libraryInfo.siteTitle) - $($libraryInfo.listTitle)"
         $targetPath = Join-Path -Path (Get-Item "$($Env:USERPROFILE)\$companyName\$compositeTitle").FullName -ChildPath $symLink.targetPath
     }
     Write-Output "Redirecting $($symLink.originalLocation) to $targetPath"

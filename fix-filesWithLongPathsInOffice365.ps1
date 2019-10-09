@@ -236,8 +236,8 @@ function doTheSharepointStuff{
         try{
             $Script:modifiedReportRows = @{}
             $Script:modifiedReportRows.Raw = @(import-csv -Path $csvPath -Delimiter "," -Encoding UTF8 | where{$_."Item ID".Length -gt 0})
-            $Script:modifiedReportRows.Results = @()
-            $Script:modifiedReportRows.FastSearch = @{}
+            [System.Collections.Generic.List[psobject]]$Script:modifiedReportRows.Results = @()
+            [System.Collections.Generic.Dictionary[guid,int]]$Script:modifiedReportRows.FastSearch = @{}
             $Script:modifiedReportRows.Raw | % {
                 if($_){
                     $Script:modifiedReportRows.Results += $_  
@@ -275,7 +275,7 @@ function doTheSharepointStuff{
     }
     
     #secondary discovery phase
-    foreach($extraSite in (Get-PnPTenantSite -IncludeOneDriveSites | select StorageUsage,Title,Url)){
+    foreach($extraSite in (Get-PnPTenantSite -IncludeOneDriveSites | select Title,Url)){
         if($extraSite.Url.StartsWith("https")){
             if($allSites.SiteUrl -notcontains $extraSite.Url){
                 $allSites+=[PSCustomObject]@{"SiteUrl"=$extraSite.Url;"Title"=$extraSite.Title;}
@@ -297,7 +297,7 @@ function doTheSharepointStuff{
             }else{
                 Connect-PnPOnline $allSites[$siteCount].SiteUrl -Credentials $script:Credential
             }
-            Get-PnPSubWebs -Recurse | % {
+            Get-PnPSubWebs -Recurse | ForEach-Object {
             
                 if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $_.Url) -or $specificSiteUrls.Count -eq 0){
                     if($sites.SiteUrl -notcontains $_.Url){

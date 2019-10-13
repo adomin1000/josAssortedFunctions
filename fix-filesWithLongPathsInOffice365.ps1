@@ -33,11 +33,18 @@
     .PARAMETER specificSiteUrls
     Comma seperated list of sites to process. If not specified ALL sites are processed (including Onedrive for Business and Microsoft Teams)
 
+    .PARAMETER specificDocumentLibraryUrls 
+    Comma seperated list of document libraries to process.
+    Not used if specificSiteUrls is supplied
+    Supply only the SITE url with the document library, no additional URL components should be present.
+    GOOD example: https://onedrivemapper.sharepoint.com/sites/SITE/Shared%20Documents
+    WRONG example: https://onedrivemapper.sharepoint.com/sites/SITE/Shared%20Documents/Forms/AllItems.aspx
+
     .NOTES
     filename: fix-FilesWithLongPathsInOffice365.ps1
     author: Jos Lieben
     blog: www.lieben.nu
-    created: 30/08/2019
+    created: 13/10/2019
 
     Example script to parse a CSV file for character types (to find ODD characters that may not be correctable by script):
     $csv = import-csv "C:\temp\SharedDocuments.csv" -Encoding UTF8
@@ -65,6 +72,7 @@ Param(
     [Parameter(Mandatory=$true)][String]$tenantName,
     [Parameter(Mandatory=$true)]$csvPath,
     [String]$specificSiteUrls=$Null,
+    [String]$specificDocumentLibraryUrls=$Null,
     [Switch]$useMFA,
     [Switch]$WhatIf
 )
@@ -92,13 +100,19 @@ if($specificSiteUrls.Length -gt 0){
     [Array]$specificSiteUrls = @()
 }
 
+if($specificDocumentLibraryUrls.Length -gt 0){
+    [Array]$specificDocumentLibraryUrls = $specificDocumentLibraryUrls.Split(",",[System.StringSplitOptions]::RemoveEmptyEntries)
+}else{
+    [Array]$specificDocumentLibraryUrls = @()
+}
+
 function Load-Module{
     Param(
         $Name
     )
     Write-Output "Checking for $Name Module"
     $module = Get-Module -Name $Name -ListAvailable
-    if ($module -eq $null) {
+    if ($null -eq $module) {
         write-Output "$Name Powershell module not installed...trying to Install, this will fail in an unelevated session"
         #Check if elevated
         If (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")){   
@@ -139,19 +153,19 @@ function EditCSV {
     #Variables MUST have script scope to allow form to see them
     $script:CsvData = import-csv $csvPath -Encoding UTF8 -Delimiter "," | Sort-Object -Descending -Property {[int]$_."Deepest Child Path Depth"}
     $script:dt = new-object System.Data.DataTable
-    $columns = $CsvData[0].psobject.Properties | select name -ExpandProperty name
-    $columns | %{
+    $columns = $CsvData[0].psobject.Properties | Select-Object name -ExpandProperty name
+    $columns | ForEach-Object {
         if(@("Deepest Child Path Depth","Delta","Path Leaf Length","Path Parent Length","Path Total Length") -contains $_){
             [void]$script:dt.columns.add($_,"int")
         }else{
             [void]$script:dt.columns.add($_,"string")
         }
     }
-    $CsvData | %{
+    $CsvData | ForEach-Object {
          $currentRow = $_
  
          $dr = $script:dt.NewRow()
-         $columns | %{
+         $columns | ForEach-Object {
             $dr.$_ = $currentRow.$_ 
          }
          $script:dt.Rows.Add($dr)
@@ -235,13 +249,15 @@ function doTheSharepointStuff{
     if($mode -eq 1){
         try{
             $Script:modifiedReportRows = @{}
-            $Script:modifiedReportRows.Raw = @(import-csv -Path $csvPath -Delimiter "," -Encoding UTF8 | where{$_."Item ID".Length -gt 0})
+            $Script:modifiedReportRows.Raw = @(import-csv -Path $csvPath -Delimiter "," -Encoding UTF8 | Where-Object {$_."Item ID".Length -gt 0})
             [System.Collections.Generic.List[psobject]]$Script:modifiedReportRows.Results = @()
             [System.Collections.Generic.Dictionary[guid,int]]$Script:modifiedReportRows.FastSearch = @{}
-            $Script:modifiedReportRows.Raw | % {
+            $counter = 0
+            $Script:modifiedReportRows.Raw | ForEach-Object {
                 if($_){
-                    $Script:modifiedReportRows.Results += $_  
-                    $Script:modifiedReportRows.FastSearch."$($_."Item ID")" = $($Script:modifiedReportRows.Results.Count-1)
+                    $Script:modifiedReportRows.Results.Add($_)  
+                    $Script:modifiedReportRows.FastSearch.Add($_."Item ID",$counter)
+                    $counter++
                 }
             }
        
@@ -255,89 +271,93 @@ function doTheSharepointStuff{
         }
     }
 
+    $targets = @()
+
     if($specificSiteUrls.Count -gt 0){
         Write-Output "Running for specific Sharepoint, Onedrive or Team sites: "
         Write-Output $specificSiteUrls
+        foreach($site in $specificSiteUrls){
+            $targets += [PSCustomObject]@{"TargetUrl"=$site;"Type"="site";}  
+        }
+    }elseif($specificDocumentLibraryUrls.Count -gt 0){
+        Write-Output "Running for specific document libraries: "
+        Write-Output $specificDocumentLibraryUrls  
+        foreach($library in $specificDocumentLibraryUrls){
+            $targets += [PSCustomObject]@{"TargetUrl"=$library;"Type"="library";}  
+        }   
     }else{
         Write-Output "Running for all Sharepoint, Onedrive and Team sites"
-    }
-
-    $allSites = @()
-    $sites = @()
-    #intial discovery phase
-    Get-PnPListItem -List DO_NOT_DELETE_SPLIST_TENANTADMIN_AGGREGATED_SITECOLLECTIONS -Fields ID,Title,TemplateTitle,SiteUrl,IsGroupConnected | % {
-        if($_.FieldValues.SiteUrl.StartsWith("https")){
-            $allSites+=[PSCustomObject]@{"SiteUrl"=$_.FieldValues.SiteUrl;"Title"=$_.FieldValues.Title;}
-            if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $_.FieldValues.SiteUrl) -or $specificSiteUrls.Count -eq 0){
-                $sites+=[PSCustomObject]@{"SiteUrl"=$_.FieldValues.SiteUrl;"Title"=$_.FieldValues.Title;}    
+        #intial discovery phase
+        Get-PnPListItem -List DO_NOT_DELETE_SPLIST_TENANTADMIN_AGGREGATED_SITECOLLECTIONS -Fields ID,Title,TemplateTitle,SiteUrl,IsGroupConnected | ForEach-Object {
+            if($_.FieldValues.SiteUrl.StartsWith("https")){
+                $targets+=[PSCustomObject]@{"TargetUrl"=$_.FieldValues.SiteUrl;"Type"="site";}    
             }
         }
-    }
-    
-    #secondary discovery phase
-    foreach($extraSite in (Get-PnPTenantSite -IncludeOneDriveSites | select Title,Url)){
-        if($extraSite.Url.StartsWith("https")){
-            if($allSites.SiteUrl -notcontains $extraSite.Url){
-                $allSites+=[PSCustomObject]@{"SiteUrl"=$extraSite.Url;"Title"=$extraSite.Title;}
+        
+        #secondary discovery phase
+        foreach($extraSite in (Get-PnPTenantSite -IncludeOneDriveSites | Select-Object Title,Url)){
+            if($extraSite.Url.StartsWith("https") -and $targets.TargetUrl -notcontains $extraSite.Url){
+                $targets+=[PSCustomObject]@{"TargetUrl"=$extraSite.Url;"Type"="site";} 
             }
-            if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $extraSite.Url) -or $specificSiteUrls.Count -eq 0){
-                if($sites.SiteUrl -notcontains $extraSite.Url){
-                    $sites+=[PSCustomObject]@{"SiteUrl"=$extraSite.Url;"Title"=$extraSite.Title;} 
+        }
+        
+        #add subsites of any of the discovered sites
+        for($targetCount = 0;$targetCount -lt $targets.Count;$targetCount++){
+            write-output "Discovering subsites of: $($targets[$targetCount].TargetUrl)"
+            try{
+                if($useMFA){
+                    Connect-PnPOnline $targets[$targetCount].TargetUrl -UseWebLogin
+                }else{
+                    Connect-PnPOnline $targets[$targetCount].TargetUrl -Credentials $script:Credential
                 }
-            }
+                Get-PnPSubWebs -Recurse | ForEach-Object {
+                    if($targets.TargetUrl -notcontains $_.Url){
+                        $targets+=[PSCustomObject]@{"TargetUrl"=$_.Url;"Type"="site";} 
+                    }        
+                }
+            }catch{$Null}
         }
-    }
-    
-    #add subsites of any of the discovered sites
-    for($siteCount = 0;$siteCount -lt $allSites.Count;$siteCount++){
-        write-output "Discovering subsites of: $($allSites[$siteCount].SiteUrl)"
-        try{
-            if($useMFA){
-                Connect-PnPOnline $allSites[$siteCount].SiteUrl -UseWebLogin
-            }else{
-                Connect-PnPOnline $allSites[$siteCount].SiteUrl -Credentials $script:Credential
-            }
-            Get-PnPSubWebs -Recurse | ForEach-Object {
-            
-                if(($specificSiteUrls.Count -gt 0 -and $specificSiteUrls -Contains $_.Url) -or $specificSiteUrls.Count -eq 0){
-                    if($sites.SiteUrl -notcontains $_.Url){
-                        $sites+=[PSCustomObject]@{"SiteUrl"=$_.Url;"Title"=$_.Title;} 
-                    }
-                }        
-            }
-        }catch{$Null}
-    }
-    
-    $sites = @($sites | where {-not $_.SiteUrl.EndsWith("/")})
-    
-    if($sites.Count -le 0){
-        if($specificSiteUrls.Length -gt 1){
-            Throw "No sites matching the specified urls found!"
-        }else{
+        
+        $targets = @($targets | Where-Object {-not $_.TargetUrl.EndsWith("/")})
+        
+        if($targets.Count -le 0){
             Throw "No sites found in your environment!"
         }
     }
 
     $reportRows = New-Object System.Collections.ArrayList
-    for($siteCount = 0;$siteCount -lt $sites.Count;$siteCount++){
-        Write-Progress -Activity "$($siteCount+1)/$($sites.Count) site $($sites[$siteCount].SiteUrl)" -Status "Retrieving lists in site..." -PercentComplete 0
-        Write-Output "Processing $($sites[$siteCount].Title) with url $($sites[$siteCount].SiteUrl)"
-        if($useMFA){
-            Connect-PnPOnline $sites[$siteCount].SiteUrl -UseWebLogin
+    for($targetCount = 0;$targetCount -lt $targets.Count;$targetCount++){
+        if($targets[$targetCount].type -eq "site"){
+            $siteUrl = $targets[$targetCount].TargetUrl
         }else{
-            Connect-PnPOnline $sites[$siteCount].SiteUrl -Credentials $script:Credential
+            $siteUrl = $targets[$targetCount].TargetUrl.SubString(0,$targets[$targetCount].TargetUrl.LastIndexOf("/"))
+            $docLibName = $targets[$targetCount].TargetUrl.SubString($targets[$targetCount].TargetUrl.LastIndexOf("/")+1)
         }
-        $lists = @(Get-PnPList -Includes BaseType,BaseTemplate,ItemCount | where {($_.BaseTemplate -eq 101 -or $_.BaseTemplate -eq 700) -and $_.ItemCount -gt 0})
+        Write-Progress -Activity "$($targetCount+1)/$($targets.Count) $($targets[$targetCount].TargetUrl)" -Status "Retrieving lists in site..." -PercentComplete 0
+        Write-Output "Processing $($targets[$targetCount].TargetUrl)"
+        if($useMFA){
+            Connect-PnPOnline $siteUrl -UseWebLogin
+        }else{
+            Connect-PnPOnline $siteUrl -Credentials $script:Credential
+        }
+        $lists = @(Get-PnPList -Includes BaseType,BaseTemplate,ItemCount | Where-Object {($_.BaseTemplate -eq 101 -or $_.BaseTemplate -eq 700) -and $_.ItemCount -gt 0})
         for($listCount = 0;$listCount -lt $lists.Count;$listCount++) {
+            if($targets[$targetCount].type -eq "library"){
+                if($lists[$listCount].RootFolder.ServerRelativeUrl.EndsWith($([System.Web.HttpUtility]::UrlDecode($docLibName)))){
+                    #correct list selected, proceed
+                }else{
+                    continue
+                }
+            }
             Write-Output "Detected document library $($lists[$listCount].Title) with Id $($lists[$listCount].Id.Guid) and Url $baseUrl$($lists[$listCount].RootFolder.ServerRelativeUrl), processing $($lists[$listCount].ItemCount) items..."
-            Write-Progress -Activity "$($siteCount+1)/$($sites.Count) site $($sites[$siteCount].SiteUrl)" -Status "Retrieving items for list $($lists[$listCount].Title)" -PercentComplete 0
+            Write-Progress -Activity "$($targetCount+1)/$($targets.Count) site $($targets[$targetCount].TargetUrl)" -Status "Retrieving items for list $($lists[$listCount].Title)" -PercentComplete 0
             $items = $Null
             $items = Get-PnPListItem -List $lists[$listCount] -PageSize 2000
             $itemCount = 0
             foreach($item in $items){
                 $itemCount++
                 try{$percentage = ($itemCount/$($lists[$listCount].ItemCount)*100)}catch{$percentage=1}
-                Write-Progress -Activity "$($siteCount+1)/$($sites.Count) site $($sites[$siteCount].SiteUrl)" -Status "Processing list $($lists[$listCount].Title) item $itemCount of $($lists[$listCount].ItemCount)" -PercentComplete $percentage
+                Write-Progress -Activity "$($targetCount+1)/$($targets.Count) site $($targets[$targetCount].TargetUrl)" -Status "Processing list $($lists[$listCount].Title) item $itemCount of $($lists[$listCount].ItemCount)" -PercentComplete $percentage
                 $importCSVInfo = "N/A"
                 $processRename = $False
 
@@ -370,7 +390,7 @@ function doTheSharepointStuff{
                     $guid = $item.FieldValues.GUID.Guid
                     try{
                         [Array]$modifiedReportRow = @()
-                        [Array]$modifiedReportRow = @($Script:modifiedReportRows.Results[$Script:modifiedReportRows.FastSearch.$guid])
+                        [Array]$modifiedReportRow = @($Script:modifiedReportRows.Results[$Script:modifiedReportRows.FastSearch[$guid]])
                     }catch{
                         [Array]$modifiedReportRow = @()
                     }
@@ -427,7 +447,7 @@ function doTheSharepointStuff{
                     "Path Total Length" = $itemFullUrl.Length
                     "Path Parent Length" = $itemFullUrl.Length-$item.FieldValues.FileLeafRef.Length
                     "Path Leaf Length" = $item.FieldValues.FileLeafRef.Length
-                    "Site URL" = $sites[$siteCount].SiteUrl
+                    "Site URL" = $targets[$targetCount].TargetUrl
                     "Item full URL" = $itemFullUrl
                     "Item ID" = $item.FieldValues.GUID.Guid
                     "Item Name" = $item.FieldValues.FileLeafRef
@@ -466,12 +486,12 @@ function doTheSharepointStuff{
     }
 
     if($mode -eq 0){
-        $reportRows = $reportRows | where {$_."Path Total Length"}
+        $reportRows = $reportRows | Where-Object {$_."Path Total Length"}
     }
 
-    Write-Progress -Activity "$($siteCount+1)/$($sites.Count)" -Status "Exporting to CSV" -PercentComplete 99
+    Write-Progress -Activity "$($targetCount+1)/$($targets.Count)" -Status "Exporting to CSV" -PercentComplete 99
     $reportRows | export-csv -Path $csvPath -Force -NoTypeInformation -Encoding UTF8 -Delimiter ","
-    Write-Progress -Activity "$($siteCount+1)/$($sites.Count)" -Status "Script complete" -PercentComplete 100 -Completed
+    Write-Progress -Activity "$($targetCount+1)/$($targets.Count)" -Status "Script complete" -PercentComplete 100 -Completed
     Write-Output "data retrieved and exported to $($csvPath)"
 }
 
@@ -490,9 +510,9 @@ while($True){
     #reprocess the CSV
     Write-Progress -Activity "UseEditor" -Status "Loading CSV file..." -PercentComplete 0
     try{
-        $reportRows = @(import-csv -Path $csvPath -Delimiter "," -Encoding UTF8 | where{$_."Item ID".Length -gt 0})
+        $reportRows = @(import-csv -Path $csvPath -Delimiter "," -Encoding UTF8 | Where-Object {$_."Item ID".Length -gt 0})
     }catch{
-        sleep -s 1
+        Start-Sleep -s 1
         continue
     }
     #loop over any changed rows and rewrite their URL's in the CSV only
@@ -562,7 +582,7 @@ while($True){
         try{
             $reportRows | export-csv -Path $csvPath -Force -NoTypeInformation -Encoding UTF8 -Delimiter ","
         }catch{
-            sleep -s 1
+            Start-Sleep -s 1
             continue
         }
     }

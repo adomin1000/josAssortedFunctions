@@ -327,11 +327,19 @@ function doTheSharepointStuff{
 
     $reportRows = New-Object System.Collections.ArrayList
     for($targetCount = 0;$targetCount -lt $targets.Count;$targetCount++){
-        if($targets[$targetCount].type -eq "site"){
-            $siteUrl = $targets[$targetCount].TargetUrl
-        }else{
-            $siteUrl = $targets[$targetCount].TargetUrl.SubString(0,$targets[$targetCount].TargetUrl.LastIndexOf("/"))
-            $docLibName = $targets[$targetCount].TargetUrl.SubString($targets[$targetCount].TargetUrl.LastIndexOf("/")+1)
+        try{
+            if($targets[$targetCount].type -eq "site"){
+                $siteUrl = $targets[$targetCount].TargetUrl
+            }else{
+                $siteUrl = $targets[$targetCount].TargetUrl.SubString(0,$targets[$targetCount].TargetUrl.LastIndexOf("/"))
+                $docLibName = $targets[$targetCount].TargetUrl.SubString($targets[$targetCount].TargetUrl.LastIndexOf("/")+1)
+                if($docLibName.Length -le 1) {
+                    Throw "Could not get document library from given target document library url: $($targets[$targetCount].TargetUrl)"
+                }
+            }
+        }catch{
+            Write-Output "skipping $($targets[$targetCount].TargetUrl)"
+            continue
         }
         Write-Progress -Activity "$($targetCount+1)/$($targets.Count) $($targets[$targetCount].TargetUrl)" -Status "Retrieving lists in site..." -PercentComplete 0
         Write-Output "Processing $($targets[$targetCount].TargetUrl)"

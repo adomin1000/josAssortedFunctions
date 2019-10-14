@@ -325,7 +325,7 @@ function doTheSharepointStuff{
         }
     }
 
-    $reportRows = New-Object System.Collections.ArrayList
+    [System.Collections.Generic.Dictionary[string,psobject]]$reportRows = @{}
     for($targetCount = 0;$targetCount -lt $targets.Count;$targetCount++){
         try{
             if($targets[$targetCount].type -eq "site"){
@@ -358,7 +358,7 @@ function doTheSharepointStuff{
                 }
             }
             Write-Output "Detected document library $($lists[$listCount].Title) with Id $($lists[$listCount].Id.Guid) and Url $baseUrl$($lists[$listCount].RootFolder.ServerRelativeUrl), processing $($lists[$listCount].ItemCount) items..."
-            Write-Progress -Activity "$($targetCount+1)/$($targets.Count) site $($targets[$targetCount].TargetUrl)" -Status "Retrieving items for list $($lists[$listCount].Title)" -PercentComplete 0
+            Write-Progress -Activity "$($targetCount+1)/$($targets.Count) site $($targets[$targetCount].TargetUrl)" -Status "Retrieving items for list $($lists[$listCount].Title) (this could take some time...)" -PercentComplete 0
             $items = $Null
             $items = Get-PnPListItem -List $lists[$listCount] -PageSize 2000
             $itemCount = 0
@@ -371,7 +371,7 @@ function doTheSharepointStuff{
 
                 $localMaxPathLength = $maxPathLengthNormalFiles
 
-                #Determine the file type and skip if a file type filter is used and it matches
+                #Determine the file type
                 if($item.FileSystemObjectType -ne "Folder"){
                     try{
                         $fileType = $Null
@@ -463,42 +463,38 @@ function doTheSharepointStuff{
                     "Item Type" = $item.FileSystemObjectType
                     "ResultOfChange" = $importCSVInfo
                 }
-                [void]$reportRows.Add((New-Object -TypeName PSObject -Property $ObjectProperties))
+                [void]$reportRows.Add($itemFullUrl,(New-Object -TypeName PSObject -Property $ObjectProperties))
             }
         }
     }
-
-    for($i = 0;$i -lt $reportRows.Count;$i++){
-        try{$percentComplete = ($i/$reportRows.Count)*100}catch{$percentComplete=1}
-        Write-Progress -Activity "Removing folders from dataset that have no child objects exceeding the maximum path length" -Status "Checking row $i of $($reportRows.Count)" -PercentComplete $percentComplete 
+   
+    $i = 0
+    foreach($key in $($reportRows.Keys)){
+        try{$percentComplete = ($i/$reportRows.Keys.Count)*100;}catch{$percentComplete=1}
+        Write-Progress -Activity "Removing folders from dataset that have no child objects exceeding the maximum path length" -Status "Checking row $i of $($reportRows.Keys.Count)" -PercentComplete $percentComplete 
         #enrich the report with additional data and filter out unneccesary data
-        if($reportRows[$i]."Item Type" -eq "Folder"){
+        if($reportRows[$key]."Item Type" -eq "Folder"){
             $script:removeFolder = $True
-            $reportRows | & {
-                process{
-                    #only process child rows
-                    if($_."Item full URL".StartsWith($reportRows[$i]."Item full URL")){
-                        if($reportRows[$i]."Deepest Child Path Depth" -lt $_."Item full URL".Length){
-                            $reportRows[$i]."Deepest Child Path Depth" = $_."Item full URL".Length
-                        }
-                        if($_."Item full URL" -ge $maxPathLengthNormalFiles){
-                            $script:removeFolder = $False
-                        }
-                    }
+            $reportRows.Keys -Match [regex]::escape($key) | % {
+                if($reportRows[$key]."Deepest Child Path Depth" -lt $reportRows[$_]."Item full URL".Length){
+                    $reportRows[$key]."Deepest Child Path Depth" = $reportRows[$_]."Item full URL".Length
+                }
+                if($reportRows[$_]."Item full URL".Length -ge $maxPathLengthNormalFiles){
+                    $script:removeFolder = $False
                 }
             }
             if($script:removeFolder -and $mode -eq 0){
-                $reportRows[$i]."Path Total Length" = $Null
+                $Null = $reportRows.Remove($key)
+                $i--
             }
-        }    
-    }
-
-    if($mode -eq 0){
-        $reportRows = $reportRows | Where-Object {$_."Path Total Length"}
+        }
+        $i++
     }
 
     Write-Progress -Activity "$($targetCount+1)/$($targets.Count)" -Status "Exporting to CSV" -PercentComplete 99
-    $reportRows | export-csv -Path $csvPath -Force -NoTypeInformation -Encoding UTF8 -Delimiter ","
+    $reportRowsArray = @()
+    $reportRows.Keys | % {$reportRowsArray += $reportRows[$_]}
+    $reportRowsArray | export-csv -Path $csvPath -Force -NoTypeInformation -Encoding UTF8 -Delimiter ","
     Write-Progress -Activity "$($targetCount+1)/$($targets.Count)" -Status "Script complete" -PercentComplete 100 -Completed
     Write-Output "data retrieved and exported to $($csvPath)"
 }

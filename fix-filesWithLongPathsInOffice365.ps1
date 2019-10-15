@@ -160,6 +160,9 @@ function EditCSV {
         }else{
             [void]$script:dt.columns.add($_,"string")
         }
+        if($_ -ne "Item Name"){
+            $script:dt.Columns[$_].ReadOnly = $True
+        }
     }
     $CsvData | ForEach-Object {
          $currentRow = $_
@@ -188,12 +191,12 @@ function EditCSV {
     #Paint Form
     $form1      = paint $null (New-Object System.Windows.Forms.Form) $null 'form1' "Lieben Consultancy" $x $y $Width $Height
                 $form1.add_Load({
-                    $dataGrid1.DataSource = $script:dt; 
+                    $dataGrid1.DataSource = $script:dt
                     $dataGrid1.AllowSorting = $True 
                     $dataGrid1.AutoSize = $True
                     $form1.refresh() 
                 }) 
-    $label1     = paint $form1 (New-Object System.Windows.Forms.Label) $null "label1" "Click Recalculate to recalculate all path lengths, use the other buttons to choose to make changes to your tenant" 12 13 ($width-100) 23
+    $label1     = paint $form1 (New-Object System.Windows.Forms.Label) $null "label1" "Sort by Delta, make your changes in the 'Item Name' column then click Recalculate to recalculate all path lengths. Use the other buttons to choose to make changes to your tenant" 12 13 ($width-100) 46
                 $label1.Font = New-Object System.Drawing.Font("Microsoft Sans Serif",9.75,2,3,0) 
                 $label1.ForeColor = [System.Drawing.Color]::FromArgb(255,0,102,204) 
     $buttonSave = paint $form1 (New-Object System.Windows.Forms.Button) 1 "button1" "Recalculate path lengths" ($width-700) ($Height-75) 200 23 

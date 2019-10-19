@@ -496,7 +496,7 @@ function doTheSharepointStuff{
 
     Write-Progress -Activity "$($targetCount+1)/$($targets.Count)" -Status "Exporting to CSV" -PercentComplete 99
     $reportRowsArray = @()
-    $reportRows.Keys | % {$reportRowsArray += $reportRows[$_]}
+    $reportRows.Keys | ForEach-Object {$reportRowsArray += $reportRows[$_]}
     $reportRowsArray | export-csv -Path $csvPath -Force -NoTypeInformation -Encoding UTF8 -Delimiter ","
     Write-Progress -Activity "$($targetCount+1)/$($targets.Count)" -Status "Script complete" -PercentComplete 100 -Completed
     Write-Output "data retrieved and exported to $($csvPath)"
@@ -516,78 +516,80 @@ while($True){
 
     #reprocess the CSV
     Write-Progress -Activity "UseEditor" -Status "Loading CSV file..." -PercentComplete 0
+    [System.Collections.Generic.Dictionary[string,psobject]]$reportRows = @{}
     try{
-        $reportRows = @(import-csv -Path $csvPath -Delimiter "," -Encoding UTF8 | Where-Object {$_."Item ID".Length -gt 0})
+        @(import-csv -Path $csvPath -Delimiter "," -Encoding UTF8 | Where-Object {$_."Item ID".Length -gt 0}) | ForEach-Object {
+            [void]$reportRows.Add($_."Item full URL",$_)
+        }
     }catch{
         Start-Sleep -s 1
         continue
     }
-    #loop over any changed rows and rewrite their URL's in the CSV only
+
+    #loop over any changed rows and rewrite their URL's in the CSV
     $changedRows = $False
-    for($i = 0;$i -lt $reportRows.Count;$i++){
+    $i=0
+    foreach($key in $($reportRows.Keys)){
+        $i++
         Write-Progress -Activity "UseEditor" -Status "Checking row $i" -PercentComplete 0
-        if($reportRows[$i]."Item full URL".EndsWith($reportRows[$i]."Item Name")){
+        if($reportRows[$key]."Item full URL".EndsWith($reportRows[$key]."Item Name")){
             continue
         }else{
             $changedRows = $True
             #now change the original URL
-            $oldUrlToReplace = $reportRows[$i]."Item full URL"                
-            $reportRows[$i]."Item full URL" = "$($reportRows[$i]."Item full URL".SubString(0,$reportRows[$i]."Item full URL".LastIndexOf("/")+1))$($reportRows[$i]."Item Name")" 
+            $oldUrlToReplace = $reportRows[$key]."Item full URL"                
+            $reportRows[$key]."Item full URL" = "$($reportRows[$key]."Item full URL".SubString(0,$reportRows[$key]."Item full URL".LastIndexOf("/")+1))$($reportRows[$key]."Item Name")" 
                 
             #if this is just a file, no need to loop over the whole CSV, only the file had to be renamed
-            if($reportRows[$i]."Item Type" -ne "Folder"){
-                Write-Output "Replaced $($reportRows[$i]."Item Name") in $oldUrlToReplace in CSV file"
+            if($reportRows[$key]."Item Type" -ne "Folder"){
+                Write-Output "Replaced $($reportRows[$key]."Item Name") in $oldUrlToReplace in CSV file"
                 Continue
             }   
                                 
             #row has a change in it, we should process renames in the entire CSV
             Write-Progress -Activity "UseEditor" -Status "Fixing row $i" -PercentComplete 0
-            $j=0
-            $reportRows | & {
-                process{
-                    if($_."Item full URL".StartsWith($oldUrlToReplace) -and $_."Item full URL" -ne $reportRows[$i]."Item full URL"){
-                        Write-Output "Replaced $($reportRows[$i]."Item full URL") in $($reportRows[$j]."Item full URL") in CSV file"
-                        $reportRows[$j]."Item full URL" = $reportRows[$j]."Item full URL".Replace($oldUrlToReplace,$reportRows[$i]."Item full URL")
-                    }
-                    $j++
+            $reportRows.Keys -Match [regex]::escape($oldUrlToReplace) | ForEach-Object {
+                if($reportRows[$_]."Item full URL" -ne $reportRows[$key]."Item full URL"){
+                    Write-Output "Replaced $($reportRows[$key]."Item full URL") in $($reportRows[$_]."Item full URL") in CSV file"
+                    $reportRows[$_]."Item full URL" = $reportRows[$_]."Item full URL".Replace($oldUrlToReplace,$reportRows[$key]."Item full URL")
                 }
             }
         }
     }
-        
+    
     if($changedRows){
         #recalculate the path length columns
-        for($i = 0;$i -lt $reportRows.Count;$i++){
-            $reportRows[$i]."Delta" = $maxPathLengthNormalFiles-$reportRows[$i]."Item full URL".Length
+        $i = 0
+        foreach($key in $($reportRows.Keys)){
+            $i++
+            $reportRows[$key]."Delta" = $maxPathLengthNormalFiles-$reportRows[$key]."Item full URL".Length
             #for folders, loop over all child items to update the deepest child path depth as well
-            if($reportRows[$i]."Item Type" -eq "Folder"){
+            if($reportRows[$key]."Item Type" -eq "Folder"){
                 Write-Progress -Activity "UseEditor" -Status "Updating child paths for row $i" -PercentComplete 0
-                [Int]$reportRows[$i]."Deepest Child Path Depth" = $reportRows[$i]."Item full URL".Length
-                $reportRows | & {
-                    process{
-                        if($_."Item full URL".StartsWith($reportRows[$i]."Item full URL")){
-                            if($reportRows[$i]."Deepest Child Path Depth" -lt $_."Item full URL".Length){
-                                $reportRows[$i]."Deepest Child Path Depth" = $_."Item full URL".Length
-                            }
-                        }
+                [Int]$reportRows[$key]."Deepest Child Path Depth" = $reportRows[$key]."Item full URL".Length
+                $reportRows.Keys -Match [regex]::escape($key) | ForEach-Object {
+                    if($reportRows[$key]."Deepest Child Path Depth" -lt $reportRows[$_]."Item full URL".Length){
+                        $reportRows[$key]."Deepest Child Path Depth" = $reportRows[$_]."Item full URL".Length
                     }
                 }
             }else{
-                $reportRows[$i]."Deepest Child Path Depth" = $reportRows[$i]."Item full URL".Length
+                $reportRows[$key]."Deepest Child Path Depth" = $reportRows[$key]."Item full URL".Length
                 $fileType = $Null
-                $fileType = $reportRows[$i]."Item full URL".Substring($reportRows[$i]."Item full URL".LastIndexOf("."))
+                $fileType = $reportRows[$key]."Item full URL".Substring($reportRows[$key]."Item full URL".LastIndexOf("."))
                 if($fileType -and $specialFileExtensions -contains $fileType){
-                    $reportRows[$i]."Delta" = $maxPathLengthSpecialFiles-$reportRows[$i]."Item full URL".Length
+                    $reportRows[$key]."Delta" = $maxPathLengthSpecialFiles-$reportRows[$key]."Item full URL".Length
                 }
             }  
-            $reportRows[$i]."Path Total Length" = $reportRows[$i]."Item full URL".Length
-            $reportRows[$i]."Path Parent Length" = $reportRows[$i]."Item full URL".Length - $reportRows[$i]."Item Name".Length                         
-            $reportRows[$i]."Path Leaf Length" = $reportRows[$i]."Item Name".Length                  
+            $reportRows[$key]."Path Total Length" = $reportRows[$key]."Item full URL".Length
+            $reportRows[$key]."Path Parent Length" = $reportRows[$key]."Item full URL".Length - $reportRows[$key]."Item Name".Length                         
+            $reportRows[$key]."Path Leaf Length" = $reportRows[$key]."Item Name".Length                  
         }
         Write-Progress -Activity "UseEditor" -Status "Exporting to CSV" -PercentComplete 0
 
         try{
-            $reportRows | export-csv -Path $csvPath -Force -NoTypeInformation -Encoding UTF8 -Delimiter ","
+            $reportRowsArray = @()
+            $reportRows.Keys | ForEach-Object {$reportRowsArray += $reportRows[$_]}
+            $reportRowsArray | export-csv -Path $csvPath -Force -NoTypeInformation -Encoding UTF8 -Delimiter ","
         }catch{
             Start-Sleep -s 1
             continue

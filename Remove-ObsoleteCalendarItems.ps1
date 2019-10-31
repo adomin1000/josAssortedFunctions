@@ -17,8 +17,6 @@ function Remove-ObsoleteCalendarItems{
     $psPropset= new-object Microsoft.Exchange.WebServices.Data.PropertySet([Microsoft.Exchange.WebServices.Data.BasePropertySet]::FirstClassProperties)  
     $psPropset.Add($Recurring)
     $psPropset.RequestedBodyType = [Microsoft.Exchange.WebServices.Data.BodyType]::Text;
-    $AppointmentState = @{0 = "None" ; 1 = "Meeting" ; 2 = "Received" ;4 = "Canceled" ; }
-
 
     #Define Date to Query 
     $currentDay = 0

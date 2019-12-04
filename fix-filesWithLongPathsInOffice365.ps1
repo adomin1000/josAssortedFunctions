@@ -2,11 +2,12 @@
     .SYNOPSIS
     report on and fix files and folders that are above a certain path length in any sharepoint, onedrive for business or teams site in Office 365
     .DESCRIPTION
-    Certain Office tools (the older the worse) cannot access Office 365 files if they exceed a certain path length. This script helps you assess which files are affected so you can remediate proactively.
-    The script can scan for all or specific file types. Certain modules are required and auto installed if you have sufficient permissions.
+    Certain Office tools (the older the worse) cannot access Office 365 files if they exceed a certain path length. This script helps you assess 
+    which files are affected and can proactively fix them. The script can scan for all or specific file types. Certain modules are required and 
+    auto installed if you have sufficient permissions. The script can be scoped to sites/libraries or the entire tenant.
 
     .EXAMPLE
-    .\fix-FilesWithLongPathsInOffice365.ps1 -specialFileExtensions ".xlsx,.xls" -maxPathLengthSpecialFiles 218 -maxPathLengthNormalFiles 256 -tenantName lieben -csvPath "c:\temp\result.csv"
+    .\fix-FilesWithLongPathsInOffice365.ps1 -specialFileExtensions ".xlsx,.xls" -maxPathLengthSpecialFiles 218 -maxPathLengthNormalFiles 256 -tenantName lieben -csvPath "c:\temp\result.csv" -specificSiteUrls "https://onedrivemapper.sharepoint.com/sites/SITE,https://onedrivemapper.sharepoint.com/sites/SITE2"
 
     .PARAMETER csvPath
     Required full path to where you want the script to write a CSV file to. Also used to read data from if it already exists
@@ -32,12 +33,14 @@
 
     .PARAMETER specificSiteUrls
     Comma seperated list of sites to process. If not specified ALL sites are processed (including Onedrive for Business and Microsoft Teams)
+    e.g. 1 site: "https://onedrivemapper.sharepoint.com/sites/SITE"
+    e.g. 2 sites: "https://onedrivemapper.sharepoint.com/sites/SITE,https://onedrivemapper.sharepoint.com/sites/SITE2"
 
     .PARAMETER specificDocumentLibraryUrls 
     Comma seperated list of document libraries to process.
     Not used if specificSiteUrls is supplied
     Supply only the SITE url with the document library, no additional URL components should be present.
-    GOOD example: https://onedrivemapper.sharepoint.com/sites/SITE/Shared%20Documents
+    GOOD example: "https://onedrivemapper.sharepoint.com/sites/SITE/Shared%20Documents"
     WRONG example: https://onedrivemapper.sharepoint.com/sites/SITE/Shared%20Documents/Forms/AllItems.aspx
 
     .NOTES

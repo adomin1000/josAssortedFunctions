@@ -2,12 +2,24 @@
     .DESCRIPTION
     Cleans up any duplicate devices in Azure AD that have the same hardware ID, by only leaving the most recently active one enabled
 
+    .PARAMETER WhatIf
+    If specified, will not remove/disable anything (report-only mode).
+    -Force overrides -WhatIf
+
+    .PARAMETER Force
+    If specified, devices will be REMOVED instead of disabled
+    NOTE: -Force overrides -WhatIf!
+
     .NOTES
     author: Jos Lieben
     blog: www.lieben.nu
     created: 17/12/2019
 #>
 
+Param(
+    [Switch]$WhatIf,
+    [Switch]$Force
+)
 
 #get all enabled AzureAD devices
 $devices = Get-MsolDevice -All | Where{$_.Enabled}
@@ -56,6 +68,18 @@ foreach($key in $duplicates.Keys){
     foreach($device in $duplicates.$key){
         if([DateTime]$device.ApproximateLastLogonTimestamp -lt $mostRecent){
             try{
+                if($Force){
+                    Remove-MsolDevice -DeviceId $device.DeviceId -Force -Confirm:$False -ErrorAction Stop
+                    Write-Output "Removed Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
+                    $cleanedUp++
+                }elseif($WhatIf){
+                    Write-Output "Should disable Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
+                    $cleanedUp++                    
+                }else{
+                    Disable-MsolDevice -DeviceId $device.DeviceId -Force -Confirm:$False -ErrorAction Stop
+                    Write-Output "Disabled Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
+                    $cleanedUp++
+                }
                 Disable-MsolDevice -DeviceId $device.DeviceId -Force -Confirm:$False -ErrorAction Stop
                 Write-Output "Disabled Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
                 $cleanedUp++

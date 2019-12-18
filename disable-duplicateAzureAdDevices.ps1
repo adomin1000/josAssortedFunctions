@@ -80,9 +80,6 @@ foreach($key in $duplicates.Keys){
                     Write-Output "Disabled Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
                     $cleanedUp++
                 }
-                Disable-MsolDevice -DeviceId $device.DeviceId -Force -Confirm:$False -ErrorAction Stop
-                Write-Output "Disabled Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
-                $cleanedUp++
             }catch{
                 Write-Output "Failed to disable Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
                 Write-Output $_.Exception

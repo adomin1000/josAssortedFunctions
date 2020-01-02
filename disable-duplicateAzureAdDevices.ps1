@@ -71,20 +71,17 @@ foreach($key in $duplicates.Keys){
                 if($Force){
                     Remove-MsolDevice -DeviceId $device.DeviceId -Force -Confirm:$False -ErrorAction Stop
                     Write-Output "Removed Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
-                    $cleanedUp++
                 }elseif($WhatIf){
-                    Write-Output "Should disable Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
-                    $cleanedUp++                    
+                    Write-Output "Should disable Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"               
                 }else{
                     Disable-MsolDevice -DeviceId $device.DeviceId -Force -Confirm:$False -ErrorAction Stop
                     Write-Output "Disabled Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
-                    $cleanedUp++
                 }
+                $cleanedUp++
             }catch{
                 Write-Output "Failed to disable Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
                 Write-Output $_.Exception
             }
-            
         }
     }
 }

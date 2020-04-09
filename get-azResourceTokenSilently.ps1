@@ -1,4 +1,31 @@
-﻿function get-azTokenSilently{
+﻿function get-azResourceTokenSilently{
+    <#
+      .SYNOPSIS
+      Retrieve graph or other azure tokens as desired (e.g. for https://main.iam.ad.ext.azure.com) and bypass MFA by repeatedly recaching the RefreshToken stolen from the TokenCache of the Az module.
+      Only the first login will require an interactive login, subsequent logins will not require interactivity and will bypass MFA.
+
+      This script is without warranty and not for commercial use without prior consent from the author. It is meant for scenario's where you need an Azure token to automate something that cannot yet be done with service principals.
+      If your refresh token expires (default 90 days of inactivity) you'll have to rerun the script interactively.
+
+      .EXAMPLE
+      $graphToken = get-azResourceTokenSilently -userUPN nobody@lieben.nu
+      .PARAMETER userUPN
+      the UPN of the user you need a token for (that is MFA enabled or protected by a CA policy)
+      .PARAMETER refreshTokenCachePath
+      Path to encrypted token cache if you don't want to use the default
+      .PARAMETER tenantId
+      If supplied, logs in to specified tenant, optional and only required if you're using Azure B2B
+      .PARAMETER resource
+      Resource your token is for, e.g. "https://graph.microsoft.com" would give a token for the Graph API
+      .PARAMETER refreshToken
+      If supplied, this is used to update the token cache and interactive login will not be required. This parameter is meant as an alternative to that initial first time interactive login
+      
+      .NOTES
+      filename: get-azResourceTokenSilently.ps1
+      author: Jos Lieben
+      blog: www.lieben.nu
+      created: 09/04/2020
+    #>
     Param(
         $refreshTokenCachePath=(Join-Path $env:APPDATA -ChildPath "azRfTknCache.cf"),
         $refreshToken,
@@ -13,9 +40,11 @@
 
     if($refreshToken){
         try{
+            write-verbose "checking provided refresh token and updating it"
             $response = (Invoke-RestMethod "https://login.windows.net/$tenantId/oauth2/token" -Method POST -Body "grant_type=refresh_token&refresh_token=$refreshToken" -ErrorAction Stop)
             $refreshToken = $response.refresh_token
             $AccessToken = $response.access_token
+            write-verbose "refresh and access token updated"
         }catch{
             Write-Output "Failed to use cached refresh token, need interactive login or token from cache"   
             $refreshToken = $False 
@@ -24,12 +53,14 @@
 
     if([System.IO.File]::Exists($refreshTokenCachePath) -and !$refreshToken){
         try{
+            write-verbose "getting refresh token from cache"
             $refreshToken = Get-Content $refreshTokenCachePath -ErrorAction Stop | ConvertTo-SecureString -ErrorAction Stop
             $refreshToken = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($refreshToken)
             $refreshToken = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($refreshToken)
             $response = (Invoke-RestMethod "https://login.windows.net/$tenantId/oauth2/token" -Method POST -Body "grant_type=refresh_token&refresh_token=$refreshToken" -ErrorAction Stop)
             $refreshToken = $response.refresh_token
             $AccessToken = $response.access_token
+            write-verbose "tokens updated using cached token"
         }catch{
             Write-Output "Failed to use cached refresh token, need interactive login"
             $refreshToken = $False
@@ -41,7 +72,6 @@
         Write-Verbose "No cache file exists and no refresh token supplied, perform interactive logon"
         if ([Environment]::UserInteractive) {
             foreach ($arg in [Environment]::GetCommandLineArgs()) {
-                # Test each Arg for match of abbreviated '-NonInteractive' command.
                 if ($arg -like '-NonI*') {
                     Throw "Interactive login required, but script is not running interactively. Run once interactively or supply a refresh token with -refreshToken"
                 }
@@ -60,6 +90,7 @@
         #if login worked, we should have a Context
         $context = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile.DefaultContext
         if($context){
+            Write-verbose "logged in, checking local refresh tokens..."
             $string = [System.Text.Encoding]::Default.GetString($context.TokenCache.CacheData)
             $marker = 0
             $tokens = @()
@@ -76,32 +107,33 @@
                 }
             }       
             $refreshToken = @($tokens | Where-Object {$_.expiresOn -gt (get-Date)} | Sort-Object -Descending -Property expiresOn | select refreshToken)[0].refreshToken
+            write-verbose "updating stolen refresh token"
             $response = (Invoke-RestMethod "https://login.windows.net/$tenantId/oauth2/token" -Method POST -Body "grant_type=refresh_token&refresh_token=$refreshToken" -ErrorAction Stop)
             $refreshToken = $response.refresh_token
             $AccessToken = $response.access_token
+            write-verbose "tokens updated"
+
         }else{
             Throw "Login-AzAccount failed, cannot continue"
         }
     }
 
     if($refreshToken){
-        #update cache file
+        write-verbose "caching refresh token"
         Set-Content -Path $refreshTokenCachePath -Value ($refreshToken | ConvertTo-SecureString -AsPlainText -Force -ErrorAction Stop | ConvertFrom-SecureString -ErrorAction Stop) -Force -ErrorAction Continue | Out-Null
+        write-verbose "refresh token cached"
     }else{
         Throw "No refresh token found in cache and no valid refresh token passed or received after login, cannot continue"
     }
 
     if($AccessToken){
+        write-verbose "update token for supplied resource"
         $null = Login-AzAccount -AccountId $userUPN -AccessToken $AccessToken
         $context = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile.DefaultContext
-        $resourceToken = [Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.Id.ToString(), $null, [Microsoft.Azure.Commands.Common.Authentication.ShowDialog]::Never, $null, "https://graph.microsoft.com").AccessToken
+        $resourceToken = [Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.Id.ToString(), $null, [Microsoft.Azure.Commands.Common.Authentication.ShowDialog]::Never, $null, $resource).AccessToken
     }else{
-        Throw "Failed to get fresh access token with refresh token, cannot continue"
+        Throw "Failed to translate access token to $resource , cannot continue"
     }
 
-    if($resourceToken){
-        return $resourceToken
-    }else{
-        Throw "Failed to translate to correct resource token, cannot continue"
-    }
+    return $resourceToken
 }

@@ -133,12 +133,13 @@ if($refreshToken){
     Throw "No refresh token found in cache and no valid refresh token passed or received after login, cannot continue"
 }
 
-if($AccessToken){
+#translate the token
+try{
     write-verbose "update token for supplied resource"
-    $null = Login-AzAccount -AccountId $userUPN -AccessToken $AccessToken
-    $context = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile.DefaultContext
-    $resourceToken = [Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.Id.ToString(), $null, [Microsoft.Azure.Commands.Common.Authentication.ShowDialog]::Never, $null, $resource).AccessToken
-}else{
+    $response = (Invoke-RestMethod "https://login.windows.net/$tenantId/oauth2/token" -Method POST -Body "resource=$([System.Web.HttpUtility]::UrlEncode($resource))&grant_type=refresh_token&refresh_token=$refreshToken&client_id=1950a258-227b-4e31-a9cf-717495945fc2&scope=openid" -ErrorAction Stop)
+    $resourceToken = $response.access_token
+    write-verbose "token translated to $resource"
+}catch{
     Throw "Failed to translate access token to $resource , cannot continue"
 }
 

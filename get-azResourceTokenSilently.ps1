@@ -1,7 +1,7 @@
 ﻿
 <#
     .SYNOPSIS
-    Retrieve graph or other azure tokens as desired (e.g. for https://main.iam.ad.ext.azure.com) and bypass MFA by repeatedly recaching the RefreshToken stolen from the TokenCache of the Az module.
+    Retrieve graph or other azure tokens as desired (e.g. for https://main.iam.ad.ext.azure.com / 74658136-14ec-4630-ad9b-26e160ff0fc6) and bypass MFA by repeatedly recaching the RefreshToken stolen from the TokenCache of the Az module.
     Only the first login will require an interactive login, subsequent logins will not require interactivity and will bypass MFA.
 
     This script is without warranty and not for commercial use without prior consent from the author. It is meant for scenario's where you need an Azure token to automate something that cannot yet be done with service principals.
@@ -16,7 +16,7 @@
     .PARAMETER tenantId
     If supplied, logs in to specified tenant, optional and only required if you're using Azure B2B
     .PARAMETER resource
-    Resource your token is for, e.g. "https://graph.microsoft.com" would give a token for the Graph API
+    Resource your token is for, e.g. "https://graph.microsoft.com" would give a token for the Graph API, "74658136-14ec-4630-ad9b-26e160ff0fc6" for the 'hidden' Azure Portal API
     .PARAMETER refreshToken
     If supplied, this is used to update the token cache and interactive login will not be required. This parameter is meant as an alternative to that initial first time interactive login
     

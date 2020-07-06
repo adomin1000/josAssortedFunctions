@@ -331,7 +331,7 @@ if($runningAsSystem){
     if([Array]@($runOnceEntries.PSObject.Properties.Name | % {if($runOnceEntries.$_ -eq "reg delete $regPath /f"){$_}}).Count -le 0){
         New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name $(Get-Random) -Value "reg delete $regPath /f" -PropertyType String -Force -ErrorAction SilentlyContinue
     }
-     
+    start-sleep -s 10
     Exit
 }
 

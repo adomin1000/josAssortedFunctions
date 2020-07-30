@@ -103,6 +103,10 @@
         "WebEndpointURI": {
             "type": "string",
             "value": "[reference(concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName')), '2019-06-01', 'Full').properties.primaryEndpoints.web]"
+        },
+        "storageAccountName": {
+            "type": "string",
+            "value": "[variables('storageAccountName')]"
         }
     }
 }

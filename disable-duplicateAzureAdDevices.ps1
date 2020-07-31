@@ -37,7 +37,7 @@ function Invoke-AzureADCleanup {
     }
     Process {
         #get all enabled AzureAD devices
-        $devices = Get-AzureADDevice -All:$true | Where{$_.Enabled}
+        $devices = Get-AzureADDevice -All:$true | Where{$_.AccountEnabled}
         $hwIds = @{}
         $duplicates=@{}
 

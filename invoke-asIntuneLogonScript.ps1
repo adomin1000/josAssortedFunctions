@@ -3,7 +3,7 @@
 #Author Blog:      http://www.lieben.nu
 #Date:             11-06-2019
 #Purpose:          Using this code in ANY Intune script 
-#Requirements:     Windows 10 build 1803
+#Requirements:     Windows 10 build 1803 or higher
 #License:          Free to use and modify non-commercially, leave headers intact. For commercial use, contact me
 #Thanks to:
 #@michael_mardahl for the idea to remove the script from the registry so it automatically reruns

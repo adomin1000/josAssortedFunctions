@@ -138,6 +138,9 @@ foreach($Device in $Devices){
         }
     }
 
+    $sb = [Text.Encoding]::ASCII.GetString([Text.Encoding]::GetEncoding("Cyrillic").GetBytes($company))
+    $company =($sb -replace '[^a-zA-Z0-9 \-]', '')
+
     if($uniqueCategories -notcontains $company){
         $uniqueCategories += $company
     }
@@ -147,7 +150,7 @@ foreach($Device in $Devices){
         if($Device.machineTags.Count -gt 0){
             foreach($tag in $Device.machineTags){
                 $Body = "{`"Value`":`"$tag`",`"Action`":`"Remove`"}"
-                (New-RetryCommand -Command 'Invoke-RestMethod' -Arguments @{Body = $Body; ContentType = "application/json"; Uri = "https://api.securitycenter.windows.com/api/machines/$($Device.id)/tags"; Method = "POST"; Headers = $(Update-MSSecApiToken -creds $o365Creds).headers; ErrorAction = "Stop"})
+                $res = (New-RetryCommand -Command 'Invoke-RestMethod' -Arguments @{Body = $Body; ContentType = "application/json"; Uri = "https://api.securitycenter.windows.com/api/machines/$($Device.id)/tags"; Method = "POST"; Headers = $(Update-MSSecApiToken -creds $o365Creds).headers; ErrorAction = "Stop"})
             }
             write-output "$($Device.id) ($($Device.computerDnsName)): removed existing tags"
         }

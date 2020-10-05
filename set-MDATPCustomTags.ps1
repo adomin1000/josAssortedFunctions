@@ -124,7 +124,9 @@ foreach($Device in $Devices){
     $company = "Unknown"
     $AzureADDevice = $Null
     $registeredUsers = $Null
-    $AzureADDevice = (New-RetryCommand -Command 'Invoke-RestMethod' -Arguments @{Uri = "https://graph.microsoft.com/beta/devices?`$filter=deviceId eq '$($Device.aadDeviceId)'"; Method = "GET"; Headers = $(Update-MSGraphApiToken -creds $o365Creds).headers; ErrorAction = "Stop"})
+    if($Device.aadDeviceId){
+        $AzureADDevice = (New-RetryCommand -Command 'Invoke-RestMethod' -Arguments @{Uri = "https://graph.microsoft.com/beta/devices?`$filter=deviceId eq '$($Device.aadDeviceId)'"; Method = "GET"; Headers = $(Update-MSGraphApiToken -creds $o365Creds).headers; ErrorAction = "Stop"})
+    }
     if($AzureADDevice){
         $registeredUsers = (New-RetryCommand -Command 'Invoke-RestMethod' -Arguments @{Uri = "https://graph.microsoft.com/beta/devices/$($AzureADDevice.value.id)/registeredUsers"; Method = "GET"; Headers = $(Update-MSGraphApiToken -creds $o365Creds).headers; ErrorAction = "Stop"})
     }

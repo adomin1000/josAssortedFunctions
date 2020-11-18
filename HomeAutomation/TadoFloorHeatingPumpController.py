@@ -22,19 +22,21 @@ r = requests.get('https://my.tado.com/api/v2/homes/'+tadoHomeId+'/zones/'+tadoHe
 j = json.loads(r.text)
 desiredTemp = j["setting"]["temperature"]["celsius"]
 currentTemp = j["sensorDataPoints"]["insideTemperature"]["celsius"]
+currentPower = j["activityDataPoints"]["heatingPower"]["percentage"]
 print("Status zone "+tadoHeatingZoneId+" : "+str(j["setting"]["power"]))
+print("Heating power for zone "+tadoHeatingZoneId+" : "+str(currentPower)+"%")
 print("Current temperature in zone "+tadoHeatingZoneId+" : "+str(currentTemp))
 print("Target temp in zone "+tadoHeatingZoneId+" : "+str(desiredTemp))
 r = requests.get(hueBaseURL+'/lights/'+hueLightID)
 j = json.loads(r.text)
 pumpState = j["state"]["on"]
 print("Floor heating pump state: "+str(pumpState))
-if currentTemp <= desiredTemp and pumpState == False :
+if currentPower > 0 and pumpState == False :
     print("PUMP SHOULD BE TURNED ON")
     r = requests.put(hueBaseURL+'/lights/'+hueLightID+'/state', data = '{"on":true}') 
     print(r.content)
     print("PUMP TURNED ON")
-elif currentTemp > desiredTemp and pumpState == True :
+elif currentPower <= 0 and pumpState == True :
     print("PUMP SHOULD BE OFF")
     r = requests.put(hueBaseURL+'/lights/'+hueLightID+'/state', data = '{"on":false}')  
     print(r.content)

@@ -10,7 +10,7 @@
     .\fix-FilesWithLongPathsInOffice365.ps1 -specialFileExtensions ".xlsx,.xls" -maxPathLengthSpecialFiles 218 -maxPathLengthNormalFiles 256 -tenantName lieben -csvPath "c:\temp\result.csv" -specificSiteUrls "https://onedrivemapper.sharepoint.com/sites/SITE,https://onedrivemapper.sharepoint.com/sites/SITE2"
 
     .PARAMETER csvPath
-    Required full path to where you want the script to write a CSV file to. Also used to read data from if it already exists
+    Required full path to where you want the script to write a CSV file to. Also used to read data from if it already exists (so don't pre-create an empty CSV file)
 
     .PARAMETER specialFileExtensions
     Specify a comma seperated list of file extensions for with to apply the maxPathLengthSpecialFiles parameter
@@ -155,6 +155,9 @@ function EditCSV {
     #LoadCSV
     #Variables MUST have script scope to allow form to see them
     $script:CsvData = import-csv $csvPath -Encoding UTF8 -Delimiter "," | Sort-Object -Descending -Property {[int]$_."Deepest Child Path Depth"}
+    if($script:csvData.Count -le 0){
+        Throw "You specified an empty CSV file! Try again without precreating the CSV file so this script can create it for you at the specified path."
+    }
     $script:dt = new-object System.Data.DataTable
     $columns = $CsvData[0].psobject.Properties | Select-Object name -ExpandProperty name
     $columns | ForEach-Object {

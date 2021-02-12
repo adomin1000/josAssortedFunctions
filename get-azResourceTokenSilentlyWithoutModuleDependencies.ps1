@@ -31,7 +31,8 @@ Param(
     $refreshToken,
     $tenantId,
     [Parameter(Mandatory=$true)]$userUPN,
-    $resource="https://graph.microsoft.com"
+    $resource="https://graph.microsoft.com",
+    $clientId="1950a258-227b-4e31-a9cf-717495945fc2" #use 1b730954-1685-4b74-9bfd-dac224a7b894 for audit/sign in log or other things that only work through the AzureAD module
 )
 
 $strCurrentTimeZone = (Get-WmiObject win32_timezone).StandardName
@@ -84,12 +85,12 @@ if(!$refreshToken){
 
     try{
         Write-Verbose "Attempting device sign in method"
-        $response = Invoke-RestMethod -Method POST -UseBasicParsing -Uri "https://login.microsoftonline.com/$tenantId/oauth2/devicecode" -ContentType "application/x-www-form-urlencoded" -Body "resource=https%3A%2F%2Fgraph.windows.net&client_id=1950a258-227b-4e31-a9cf-717495945fc2"
+        $response = Invoke-RestMethod -Method POST -UseBasicParsing -Uri "https://login.microsoftonline.com/$tenantId/oauth2/devicecode" -ContentType "application/x-www-form-urlencoded" -Body "resource=https%3A%2F%2Fgraph.windows.net&client_id=$clientId"
         Write-Output $response.message
         $waited = 0
         while($true){
             try{
-                $authResponse = Invoke-RestMethod -uri "https://login.microsoftonline.com/$tenantId/oauth2/token" -ContentType "application/x-www-form-urlencoded" -Method POST -Body "grant_type=device_code&resource=https%3A%2F%2Fgraph.windows.net&code=$($response.device_code)&client_id=1950a258-227b-4e31-a9cf-717495945fc2" -ErrorAction Stop
+                $authResponse = Invoke-RestMethod -uri "https://login.microsoftonline.com/$tenantId/oauth2/token" -ContentType "application/x-www-form-urlencoded" -Method POST -Body "grant_type=device_code&resource=https%3A%2F%2Fgraph.windows.net&code=$($response.device_code)&client_id=$clientId" -ErrorAction Stop
                 $refreshToken = $authResponse.refresh_token
                 break
             }catch{
@@ -118,7 +119,7 @@ if($refreshToken){
 #translate the token
 try{
     write-verbose "update token for supplied resource"
-    $response = (Invoke-RestMethod "https://login.windows.net/$tenantId/oauth2/token" -Method POST -Body "resource=$([System.Web.HttpUtility]::UrlEncode($resource))&grant_type=refresh_token&refresh_token=$refreshToken&client_id=1950a258-227b-4e31-a9cf-717495945fc2&scope=openid" -ErrorAction Stop)
+    $response = (Invoke-RestMethod "https://login.windows.net/$tenantId/oauth2/token" -Method POST -Body "resource=$([System.Web.HttpUtility]::UrlEncode($resource))&grant_type=refresh_token&refresh_token=$refreshToken&client_id=$clientId&scope=openid" -ErrorAction Stop)
     $resourceToken = $response.access_token
     write-verbose "token translated to $resource"
 }catch{

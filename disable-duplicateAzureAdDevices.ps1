@@ -84,12 +84,12 @@ function Invoke-AzureADCleanup {
                 if([DateTime]$device.ApproximateLastLogonTimestamp -lt $mostRecent){
                     try{
                         if($Force){
-                            Remove-AzureADDevice -DeviceId $device.DeviceId -Force -Confirm:$False -ErrorAction Stop
+                            Remove-AzureADDevice -ObjectId $device.objectId -verbose  -ErrorAction Stop
                             Write-Output "Removed Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
                         }elseif($WhatIf){
                             Write-Output "Should disable Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"               
                         }else{
-                            Disable-AzureADDevice -DeviceId $device.DeviceId -Force -Confirm:$False -ErrorAction Stop
+                            Disable-AzureADDevice -ObjectId $device.objectId -verbose  -ErrorAction Stop
                             Write-Output "Disabled Stale device $($device.DisplayName) with last active date: $($device.ApproximateLastLogonTimestamp)"
                         }
                         $cleanedUp++
@@ -123,4 +123,4 @@ function Invoke-AzureADCleanup {
     }
 }
 
-Invoke-AzureADCleanup -Whatif
+Invoke-AzureADCleanup -WhatIf

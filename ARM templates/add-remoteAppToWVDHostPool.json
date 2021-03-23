@@ -125,7 +125,7 @@
                 }
             }
         ],
-        "appGroupResourceId": "[resourceId('Microsoft.DesktopVirtualization/applicationgroups/', parameters('appGroupName'))]",
+        "appGroupResourceId": "[resourceId('Microsoft.DesktopVirtualization/applicationgroups/', parameters('appGroupName'))]"
     },
     "resources": [
         {

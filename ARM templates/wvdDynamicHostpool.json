@@ -1,16 +1,6 @@
 {
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-  "contentVersion": "1.0.3.0",
-  //Author: Jos Lieben
-  //IMPORTANT NOTES:
-  //REMOVE THESE COMMENTS WHEN NOT DEPLOYING THROUGH PORTAL, COMMENTS IN JSON ARE NOT USUALLY ACCEPTED BY MOST TOOLS
-  //1. when using redeploy, make sure ALL the virtual machines in the resourcegroup are deleted first. Nic's and Disks should remain as they will be reconnected to the new VM's. Partial redeploy is not supported.
-  //2. when using redeploy, the values for existingNumberOfInstances and vmNumberOfInstances should be the same, and also the same as the number of disks you're passing into existingDiskNames
-  //3. when using redeploy, the disks for the old VM's should be passed into existingDiskNames as array in order
-  //4. when using redeploy, after the deployment is completed, you'll have 1 snapshot and 2 disks per VM, you should clean up the snapshot and oldest (unattached) disks as part of the pipeline
-  //5. when not using redeploy, make sure to verify the existingNumerOfInstances parameter. If that isn't set correctly, unexpected behavior may occur
-  //6. taking above into account, this template will allow you to completely redeploy VM's or to add VM's that have a different configuration (disk, size, image) compared to the original VM's in the hostpool
-  //7. when using Personal hosts, make sure to reconnect the previous user
+  "contentVersion": "1.0.5.0",
   "parameters": {
     "artifactsLocation": {
       "type": "string",
@@ -25,6 +15,13 @@
         "description": "Use redeploy=true only together with the existingDiskNames parameter, ARM will then attempt to create new VM's but using the existing disks as passed into existingDiskNames. If deploying a new pool or not requiring full redeployment, set to false"
       },
       "defaultValue": false
+    },    
+    "upgrade": {
+      "type": "bool",
+      "metadata": {
+        "description": "Use upgrade=true in case an upgrade of the OS build is required, snapshots will then be made of each disk in the existingDiskNames parameter."
+      },
+      "defaultValue": false
     },
     "currentDateTime": {
       "type": "string",
@@ -36,11 +33,21 @@
     "existingDiskNames": {
       "type": "array",
       "metadata": {
-        "description": "list of the names of existing disks that should be re-attached, the number properties map to the session host names and should thus be ordered ascendingly! Ignored if redeploy is set to False"
+        "description": "list of the names of existing disks that should be re-attached, the number properties map to the session host names and should thus be ordered ascendingly! Not needed if redeploy is set to False"
       },
       "defaultValue": [
         "rdsh0_OsDisk_1_6a58fd7423334474b33c12c70133b463",
         "rdsh1_OsDisk_1_6a58fd742333ff34b33c12c70133b461"
+      ]
+    },
+    "existingVmNames": {
+      "type": "array",
+      "metadata": {
+        "description": "list of the names of existing VM's (excluding domain). Not required for New Hostpools"
+      },
+      "defaultValue": [
+        "weeus15pvd001",
+        "weeus15pvd002"
       ]
     },
     "hostpoolName": {
@@ -108,27 +115,16 @@
     "applicationGroupName": {
       "type": "string",
       "metadata": {
-        "description": "The name of the application group that should be created"
+        "description": "The name of the application group that should be created for desktop hosts"
       },
       "defaultValue": "WeEu-S15-Prd-Vdag-Wivd-02"
     },
     "applicationGroupFriendlyName": {
       "type": "string",
       "metadata": {
-        "description": "The name of the desktop or remoteapp as displayed to the user in the WVD clients"
+        "description": "The name of the desktop as displayed to the user in the WVD clients"
       },
       "defaultValue": "Production DevOps Desktop"
-    },
-    "applicationGroupType": {
-      "type": "string",
-      "allowedValues": [
-        "Desktop",
-        "RemoteApp"
-      ],
-      "metadata": {
-        "description": "The type of group (remoteapp or desktop)"
-      },
-      "defaultValue": "Desktop"
     },
     "desktopDescription": {
       "type": "string",
@@ -163,7 +159,7 @@
       "metadata": {
         "description": "The size of the session host VMs."
       },
-      "defaultValue": "Standard_D4s_v4"
+      "defaultValue": "Standard_D4ds_v4"
     },
     "vmNumberOfInstances": {
       "type": "int",
@@ -171,13 +167,6 @@
         "description": "Number of session hosts that the hostpool should have in total (if more than current, hosts will be added). If redeploy=true, this should be the original number of hosts before you deleted them"
       },
       "defaultValue": 1
-    },
-    "existingNumberOfInstances": {
-      "type": "int",
-      "metadata": {
-        "description": "Number of session hosts already present in the hostpool, if redeploy=true, this should be the original number of hosts before you deleted them"
-      },
-      "defaultValue": 0
     },
     "vmNamePrefix": {
       "type": "string",
@@ -283,10 +272,11 @@
       "type": "string",
       "allowedValues": [
         "Personal",
-        "Pooled"
+        "Pooled",
+        "RemoteApp"
       ],
       "metadata": {
-        "description": "Set this parameter to Personal if you would like to enable Persistent Desktop experience. Defaults to false."
+        "description": "Set this parameter to Personal if you would like to enable Persistent Desktop experience, to RemoteApp if only single apps will be hosted, and Pooled if this is a non persistent hostpool."
       },
       "defaultValue": "Pooled"
     },
@@ -326,12 +316,12 @@
       "metadata": {
         "description": "Hostpool rdp properties"
       },
-      "defaultValue": "audiomode:i:0;audiocapturemode:i:1;camerastoredirect:s:;devicestoredirect:s:"
+      "defaultValue": "audiomode:i:0;audiocapturemode:i:1;camerastoredirect:s:;devicestoredirect:s:;singlemoninwindowedmode:i:1;smart sizing:i:1;"
     },
     "tokenExpirationTime": {
       "type": "string",
       "metadata": {
-        "description": "Hostpool token expiration time, min 1 hour, max 30 days in the following format: 2020-10-13T18:01:54"
+        "description": "Hostpool token expiration time, min 1 hour, max 30 days in the following format: 2021-04-01T12:34:56"
       }
     },
     "hostpoolTags": {
@@ -375,13 +365,6 @@
         "description": "Whether to use validation enviroment."
       },
       "defaultValue": false
-    },
-    "preferredAppGroupType": {
-      "type": "string",
-      "metadata": {
-        "description": "Preferred App Group type to display"
-      },
-      "defaultValue": "Desktop"
     },
     "ouPath": {
       "type": "string",
@@ -442,6 +425,7 @@
         }
       }
     ],
+    "preferredAppGroupType": "[if(equals(parameters('hostpoolType'),'RemoteApp'),'RailApplications','Desktop')]",
     "workspaceId": "[concat('/subscriptions/',subscription().subscriptionId,'/resourcegroups/',parameters('logAnalyticsResourcegroup'),'/providers/microsoft.operationalinsights/workspaces/',parameters('logAnalyticsName'))]"
 
   },
@@ -522,6 +506,28 @@
       }
     },
     {
+      "name": "[concat(parameters('vmNamePrefix'), copyindex(), '-osdisk-01-Snapshot-Long-Upgrade-',parameters('currentDateTime'))]",
+      "condition": "[parameters('upgrade')]",
+      "type": "Microsoft.Compute/snapshots",
+      "apiVersion": "2020-09-30",
+      "location": "[parameters('vmLocation')]",
+      "tags": {},
+      "copy": {
+        "name": "rdsh-create-snapshots",
+        "count": "[parameters('vmNumberOfInstances')]"
+      },
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "properties": {
+        "osType": "Windows",
+        "creationData": {
+          "createOption": "Copy",
+          "sourceResourceId": "[resourceId(subscription().subscriptionId,resourceGroup().name,'Microsoft.Compute/disks',parameters('existingDiskNames')[copyindex()])]"
+        }
+      }
+    },
+    {
       "name": "[concat(parameters('vmNamePrefix'), copyindex(), '-osdisk-01-',parameters('currentDateTime'))]",
       "condition": "[parameters('redeploy')]",
       "apiVersion": "2020-09-30",
@@ -570,13 +576,13 @@
       ],
       "properties": {
         "hardwareProfile": {
-          "vmSize": "[if(parameters('redeploy'),parameters('vmSize'),if(less(copyindex(),parameters('existingNumberOfInstances')),json('null'),parameters('vmSize')))]"
+          "vmSize": "[if(parameters('redeploy'),parameters('vmSize'),if(contains(parameters('existingVmNames'),concat(parameters('vmNamePrefix'), copyindex())),json('null'),parameters('vmSize')))]"
         },
-        "osProfile": "[if(parameters('redeploy'),json('null'),if(less(copyindex(),parameters('existingNumberOfInstances')),json('null'),variables('osProfiles')[copyIndex()]))]",
+        "osProfile": "[if(parameters('redeploy'),json('null'),if(contains(parameters('existingVmNames'),concat(parameters('vmNamePrefix'), copyindex())),json('null'),variables('osProfiles')[copyIndex()]))]",
         "storageProfile": {
-          "imageReference": "[if(parameters('redeploy'),json('null'),if(less(copyindex(),parameters('existingNumberOfInstances')),json('null'),variables('imageReference')))]",
+          "imageReference": "[if(parameters('redeploy'),json('null'),if(contains(parameters('existingVmNames'),concat(parameters('vmNamePrefix'), copyindex())),json('null'),variables('imageReference')))]",
           "osDisk": {
-            "createOption": "[if(parameters('redeploy'),'Attach',if(less(copyindex(),parameters('existingNumberOfInstances')),json('null'),'FromImage'))]",
+            "createOption": "[if(parameters('redeploy'),'Attach',if(contains(parameters('existingVmNames'),concat(parameters('vmNamePrefix'), copyindex())),json('null'),'FromImage'))]",
             "managedDisk": {
               "id": "[if(parameters('redeploy'),resourceId('Microsoft.Compute/disks',concat(parameters('vmNamePrefix'),copyindex(),'-osdisk-01-',parameters('currentDateTime'))),json('null'))]",
               "storageAccountType": "[parameters('vmDiskType')]"
@@ -682,13 +688,13 @@
       "properties": {
         "friendlyName": "Host Pool",
         "description": "[parameters('hostpoolDescription')]",
-        "hostpoolType": "[parameters('hostpoolType')]",
+        "hostpoolType": "[if(equals(parameters('hostpoolType'),'Personal'),'Personal','Pooled')]",
         "customRdpProperty": "[parameters('customRdpProperty')]",
         "personalDesktopAssignmentType": "[parameters('personalDesktopAssignmentType')]",
         "maxSessionLimit": "[parameters('maxSessionLimit')]",
         "loadBalancerType": "[parameters('loadBalancerType')]",
         "validationEnvironment": "[parameters('validationEnvironment')]",
-        "preferredAppGroupType": "[parameters('preferredAppGroupType')]",
+        "preferredAppGroupType": "[variables('preferredAppGroupType')]",
         "ring": null,
         "registrationInfo": {
           "expirationTime": "[parameters('tokenExpirationTime')]",
@@ -739,13 +745,14 @@
       "name": "[parameters('applicationGroupName')]",
       "apiVersion": "[parameters('apiVersion')]",
       "type": "Microsoft.DesktopVirtualization/applicationgroups",
+      "condition": "[not(equals(parameters('hostpoolType'),'RemoteApp'))]",
       "location": "[parameters('hostpoolLocation')]",
       "tags": "[parameters('applicationGroupTags')]",
       "properties": {
         "hostpoolarmpath": "[resourceId('Microsoft.DesktopVirtualization/hostpools/', parameters('hostpoolName'))]",
         "friendlyName": "[parameters('applicationGroupFriendlyName')]",
         "description": "[parameters('desktopDescription')]",
-        "applicationGroupType": "[parameters('applicationGroupType')]"
+        "applicationGroupType": "Desktop"
       },
       "dependsOn": [
         "[resourceId('Microsoft.DesktopVirtualization/hostpools/', parameters('hostpoolName'))]"
@@ -753,6 +760,7 @@
     },
     {
       "name": "[concat(parameters('applicationGroupName'),'/microsoft.insights/toLogAnalytics')]",
+      "condition": "[not(equals(parameters('hostpoolType'),'RemoteApp'))]",
       "type": "Microsoft.DesktopVirtualization/applicationgroups/providers/diagnosticSettings",
       "apiVersion": "2017-05-01-preview",
       "properties": {
@@ -779,6 +787,7 @@
     {
       "apiVersion": "2018-05-01",
       "name": "AddAppGroupToWorkspaceIncrementally",
+      "condition": "[not(equals(parameters('hostpoolType'),'RemoteApp'))]",
       "type": "Microsoft.Resources/deployments",
       "resourceGroup": "[parameters('workspaceResourceGroup')]",
       "properties": {

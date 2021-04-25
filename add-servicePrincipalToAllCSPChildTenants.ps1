@@ -85,9 +85,9 @@ foreach($tenant in $childTenants){
         }
         try{
             $res = Invoke-RestMethod -Method POST -body ($patchBody | convertto-json) -Uri "https://graph.microsoft.com/beta/oauth2PermissionGrants" -Headers @{"Authorization"="Bearer $graphToken"} -ContentType "application/json"
-            Write-Host "Permission $($api.id) for instance $($resourceLocalInstance.Id) set" -ForegroundColor Green
+            Write-Host "Permission AuditLog.Read.All for instance $($resourceLocalInstance.Id) set" -ForegroundColor Green
         }catch{
-            Write-Host "Failed to set permission $($api.id) for instance $($resourceLocalInstance.Id)" -ForegroundColor Red
+            Write-Host "Failed to set permission AuditLog.Read.All for instance $($resourceLocalInstance.Id)" -ForegroundColor Red
         }
     }catch{
         Write-Host "Failed to retrieve local instance of $($resource.resourceAppId)" -ForegroundColor Red

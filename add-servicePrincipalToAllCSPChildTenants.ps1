@@ -19,10 +19,12 @@ Param(
     [String]$primarySpnClientID
 )
 
+$userName = Read-Host "Enter your username (should be in the Admin Agents role)"
+
 try{
-    Write-Host "Please log in to the main tenant"
-    $connection = Login-AzAccount -Force -Confirm:$False -SkipContextPopulation -Tenant $domain -ErrorAction Stop
+    $connection = Login-AzAccount -Force -Confirm:$False -SkipContextPopulation -Tenant $userName.Split("@")[1] -ErrorAction Stop
     $context = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile.DefaultContext
+    if($connection.Context.Account.Id -ne $userName){Throw "Account prompt+login do not match"}
 }catch{
     Write-Host "Failed to log in and/or retrieve token, aborting" -ForegroundColor Red
     Write-Host $_
@@ -55,8 +57,8 @@ foreach($tenant in $childTenants){
         Write-Host "$($tenant.displayName) skipped" -ForegroundColor Yellow
         continue
     }
-    Write-Host "Please login using a CSP admin in the Admin Agents Role in $domain" -ForegroundColor Green
-    $connection = Login-AzAccount -Force -Confirm:$False -SkipContextPopulation -Tenant $tenant.customerContextId -ErrorAction Stop
+    Write-Host "Please login using $userName if prompted" -ForegroundColor Green
+    $connection = Login-AzAccount -Force -Confirm:$False -SkipContextPopulation -Tenant $tenant.customerContextId -ErrorAction Stop -DefaultProfile $context
     $secondarySP = Get-AzADServicePrincipal -ApplicationId $primarySpnClientID -DefaultProfile $connection
     if(!$secondarySP){
         Write-Host "No child service principal found in $($tenant.customerContextId), creating..." -ForegroundColor Green

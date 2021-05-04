@@ -1,5 +1,4 @@
-﻿
-<#
+﻿<#
     .SYNOPSIS
     Retrieve graph or other azure tokens as desired (e.g. for https://main.iam.ad.ext.azure.com) and bypass MFA by repeatedly recaching the RefreshToken
     Only the first login will require an interactive / device login, subsequent logins will not require interactivity and will bypass MFA.

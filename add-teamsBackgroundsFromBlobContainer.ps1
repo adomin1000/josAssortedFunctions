@@ -10,9 +10,12 @@
     created: 13/05/2021
 #>
 
+$changedDate = "2021-05-13"
+
 $containerName = "tasdsadgsadsad" #this is the name of your storage account in Azure 
 
 $source = "https://$($containerName).blob.core.windows.net/teamsbackgrounds?restype=container&comp=list"
+Write-Output "Running version $changedDate"
 
 Write-Output "Retrieving Blob container index..."
 try{

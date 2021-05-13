@@ -10,6 +10,8 @@
     created: 13/05/2021
 #>
 
+Start-Transcript -Path (Join-Path -Path $Env:TEMP -ChildPath "add-teamsBackgroundsFromBlobContainer.log")
+
 $changedDate = "2021-05-13"
 
 $containerName = "tasdsadgsadsad" #this is the name of your storage account in Azure 
@@ -75,3 +77,4 @@ foreach($image in $images){
 }
 
 Write-Output "Script complete"
+Stop-Transcript

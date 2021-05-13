@@ -48,6 +48,17 @@ if($images.count -eq 0){
 
 $targetPath = (Join-Path $Env:APPDATA -ChildPath "\Microsoft\Teams\Backgrounds\Uploads")
 
+#create Uploads folder if it doesn't exist
+if(![System.IO.Directory]::Exists($targetPath)){
+    try{
+        New-Item -Path $targetPath -ItemType Directory -Force | out-null
+    }catch{
+        Write-Output "Failed to create path for teams backgrounds"
+        Write-Error $_ -ErrorAction SilentlyContinue
+        Exit
+    }
+}
+
 Write-Output "Downloading images to $targetPath"
 
 foreach($image in $images){

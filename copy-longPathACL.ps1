@@ -20,10 +20,10 @@ if([Alphaleonis.Win32.Filesystem.Directory]::Exists($sourcePath)){
 
 if([Alphaleonis.Win32.Filesystem.Directory]::Exists($targetPath)){
     Write-Verbose "Detected targetPath as FOLDER"   
-    $targetObject = New-Object Alphaleonis.Win32.Filesystem.DirectoryInfo($sourcePath)
+    $targetObject = New-Object Alphaleonis.Win32.Filesystem.DirectoryInfo($targetPath)
 }elseif([Alphaleonis.Win32.Filesystem.File]::Exists($targetPath)){
     Write-Verbose "Detected targetPath as FILE"
-    $targetObject = New-Object Alphaleonis.Win32.Filesystem.FileInfo($sourcePath)
+    $targetObject = New-Object Alphaleonis.Win32.Filesystem.FileInfo($targetPath)
 }else{
     Throw "targetPath not found"
 }

@@ -1,4 +1,4 @@
-<#
+﻿<#
     .DESCRIPTION
     Local Admin Password Rotation and Account Management
     Set configuration values, and follow rollout instructions at https://www.lieben.nu/liebensraum/?p=3605
@@ -45,7 +45,7 @@ $newPwd = $Null
 
 if($mode -ne "detect"){
     try{
-        $pwd = Get-Content $tempCache
+        $pwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR((Get-Content $tempCache | ConvertTo-SecureString)))
         Write-Host $pwd
         $Null = Remove-Item -Path $tempCache -Force -Confirm:$False
         Exit 0
@@ -104,7 +104,7 @@ if((New-TimeSpan -Start $localAdmin.PasswordLastSet -End (Get-Date)).TotalDays -
 }
 
 if($newPwd){
-    Set-Content $tempCache -Value $newPwd -Force -Confirm:$False
+    $res = Set-Content $tempCache -Value (ConvertFrom-SecureString (ConvertTo-SecureString $newPwd -asplaintext -force)) -Force -Confirm:$False
     Write-Host "Password was reset by LeanLAPS"
     Exit 1
 }else{

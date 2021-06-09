@@ -1,12 +1,11 @@
-<#
+﻿<#
     .DESCRIPTION
     Local Admin Password Rotation and Account Management
-    Set configuration values, and follow rollout instructions
+    Set configuration values, and follow rollout instructions at https://www.lieben.nu/liebensraum/?p=3605
   
     .NOTES
     filename:       leanLAPS.ps1
     author:         Jos Lieben (Lieben Consultancy)
-    team:           Workplace Services
     created:        09/06/2021
     last updated:   09/06/2021
     copyright:      2021, Jos Lieben, Lieben Consultancy, not for commercial use without written consent
@@ -19,10 +18,6 @@ $minimumPasswordLength = 21
 $localAdminName = "LCAdmin"
 $removeOtherLocalAdmins = $False
 $onlyRunOnWindows10 = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
-
-if($onlyRunOnWindows10 -and [Environment]::OSVersion.Version.Major -ne 10){
-    Exit 1
-}
 
 function Get-NewPassword($passwordLength){
    -join ('abcdefghkmnrstuvwxyzABCDEFGHKLMNPRSTUVWXYZ23456789!{}@%'.ToCharArray() | Get-Random -Count $passwordLength)
@@ -37,6 +32,12 @@ Function Write-Log($Message){
 }
 
 Write-Log "LeanLAPS starting on $($ENV:COMPUTERNAME) as $($MyInvocation.MyCommand.Name)"
+
+if($onlyRunOnWindows10 -and [Environment]::OSVersion.Version.Major -ne 10){
+    Write-Log "Unsupported OS!"
+    Write-Error "Unsupported OS!"
+    Exit 0
+}
 
 $mode = $MyInvocation.MyCommand.Name.Split(".")[0]
 $newPwd = $Null
@@ -76,8 +77,8 @@ try{
     }
 }catch{
     Write-Log "Something went wrong while processing the local administrators group $($_)"
-    Write-Host "Something went wrong while processing the local administrators group $($_)"
-    Exit 1
+    Write-Error "Something went wrong while processing the local administrators group $($_)"
+    Exit 0
 }
 
 if($newPwd){ #newly created admin
@@ -100,10 +101,10 @@ if((New-TimeSpan -Start $localAdmin.PasswordLastSet -End (Get-Date)).TotalDays -
         Exit 0
     }catch{
         Write-Log "Failed to set new password for $localAdminName"
-        Write-Host "Failed to set password for $localAdminName because of $($_)"
+        Write-Error "Failed to set password for $localAdminName because of $($_)"
         Exit 1
     }
 }
 
-Write-Log "leanLAPS completed"
+Write-Log "No remediation needed, LeanLAPS will exit"
 Exit 0

@@ -43,16 +43,21 @@ if($onlyRunOnWindows10 -and [Environment]::OSVersion.Version.Major -ne 10){
 $mode = $MyInvocation.MyCommand.Name.Split(".")[0]
 $newPwd = $Null
 
-if($mode -ne "detect"){
-    try{
-        $pwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR((Get-Content $tempCache | ConvertTo-SecureString)))
-        Write-Host $pwd
-        $Null = Remove-Item -Path $tempCache -Force -Confirm:$False
-        Exit 0
-    }catch{
-        Write-Host "Failed to get new password"
-        Exit 1
+if($mode -eq "detect"){
+    if((Test-Path $tempCache)){
+        Write-CustomEventLog "Encrypted new password detected, outputting to MDE.."
+        try{
+            $pwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR((Get-Content $tempCache | ConvertTo-SecureString)))
+            Write-Host $pwd
+            $Null = Remove-Item -Path $tempCache -Force -Confirm:$False
+            Exit 0
+        }catch{
+            Write-Host "Failed to get new password"
+            Exit 1
+        }
     }
+}else{
+    Exit 0
 }
 
 try{
@@ -105,7 +110,7 @@ if((New-TimeSpan -Start $localAdmin.PasswordLastSet -End (Get-Date)).TotalDays -
 
 if($newPwd){
     $res = Set-Content $tempCache -Value (ConvertFrom-SecureString (ConvertTo-SecureString $newPwd -asplaintext -force)) -Force -Confirm:$False
-    Write-Host "Password was reset by LeanLAPS"
+    Write-Host "LeanLAPS generated a new password"
     Exit 1
 }else{
     Write-Host "LeanLAPS is up to date"

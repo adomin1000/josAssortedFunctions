@@ -1,4 +1,4 @@
-﻿<#
+<#
     .DESCRIPTION
     Local Admin Password Rotation and Account Management
     Set configuration values, and follow rollout instructions at https://www.lieben.nu/liebensraum/?p=3605
@@ -18,23 +18,24 @@ $minimumPasswordLength = 21
 $localAdminName = "LCAdmin"
 $removeOtherLocalAdmins = $False
 $onlyRunOnWindows10 = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
+$tempCache = Join-Path $Env:TEMP -ChildPath "tempLCAdmin.crx"
 
 function Get-NewPassword($passwordLength){
-   -join ('abcdefghkmnrstuvwxyzABCDEFGHKLMNPRSTUVWXYZ23456789!{}@%'.ToCharArray() | Get-Random -Count $passwordLength)
+   -join ('abcdefghkmnrstuvwxyzABCDEFGHKLMNPRSTUVWXYZ23456789'.ToCharArray() | Get-Random -Count $passwordLength)
 }
 
-Function Write-Log($Message){
+Function Write-CustomEventLog($Message){
     $EventSource=".LiebenConsultancy"
     if ([System.Diagnostics.EventLog]::Exists('Application') -eq $False -or [System.Diagnostics.EventLog]::SourceExists($EventSource) -eq $False){
-        New-EventLog -LogName Application -Source $EventSource  | Out-Null
+        $res = New-EventLog -LogName Application -Source $EventSource  | Out-Null
     }
-    Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1985 -Message $Message
+    $res = Write-EventLog -LogName Application -Source $EventSource -EntryType Information -EventId 1985 -Message $Message
 }
 
-Write-Log "LeanLAPS starting on $($ENV:COMPUTERNAME) as $($MyInvocation.MyCommand.Name)"
+Write-CustomEventLog "LeanLAPS starting on $($ENV:COMPUTERNAME) as $($MyInvocation.MyCommand.Name)"
 
 if($onlyRunOnWindows10 -and [Environment]::OSVersion.Version.Major -ne 10){
-    Write-Log "Unsupported OS!"
+    Write-CustomEventLog "Unsupported OS!"
     Write-Error "Unsupported OS!"
     Exit 0
 }
@@ -42,17 +43,25 @@ if($onlyRunOnWindows10 -and [Environment]::OSVersion.Version.Major -ne 10){
 $mode = $MyInvocation.MyCommand.Name.Split(".")[0]
 $newPwd = $Null
 
+if($mode -ne "detect"){
+    try{
+        $pwd = Get-Content $tempCache
+        Write-Host $pwd
+        $Null = Remove-Item -Path $tempCache -Force -Confirm:$False
+        Exit 0
+    }catch{
+        Write-Host "Failed to get new password"
+        Exit 1
+    }
+}
+
 try{
     $localAdmin = Get-LocalUser -name $localAdminName -ErrorAction Stop
 }catch{
-    if($mode -eq "detect"){
-        Write-Log "$localAdminName doesn't exist yet, restarting in remediate mode"
-        Exit 1
-    }
-    Write-Log "$localAdminName doesn't exist yet, creating..."
+    Write-CustomEventLog "$localAdminName doesn't exist yet, creating..."
     $newPwd = Get-NewPassword $minimumPasswordLength
     $localAdmin = New-LocalUser -AccountNeverExpires -Name $localAdminName -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force)
-    Write-Log "$localAdminName created"
+    Write-CustomEventLog "$localAdminName created"
 }
 
 try{
@@ -61,50 +70,44 @@ try{
     $administrators = $group.GetRelated('Win32_UserAccount')
 
     if($administrators.SID -notcontains $($localAdmin.SID.Value)){
-        Write-Log "$localAdminName is not a local administrator, adding..."
-        Add-LocalGroupMember -Group (Get-LocalGroup -SID S-1-5-32-544) -Member $localAdmin -Confirm:$False -ErrorAction Stop
-        Write-Log "Added $localAdminName to the local administrators group"
+        Write-CustomEventLog "$localAdminName is not a local administrator, adding..."
+        $res = Add-LocalGroupMember -Group (Get-LocalGroup -SID S-1-5-32-544) -Member $localAdmin -Confirm:$False -ErrorAction Stop
+        Write-CustomEventLog "Added $localAdminName to the local administrators group"
     }
     #remove other local admins if specified, only executes if adding the new local admin succeeded
     if($removeOtherLocalAdmins){
         foreach($administrator in $administrators){
             if($administrator.SID -ne $localAdmin.SID.Value){
-                Write-Log "removeOtherLocalAdmins set to True, removing $($administrator.Name) from Local Administrators"
-                Remove-LocalGroupMember -Group (Get-LocalGroup -SID S-1-5-32-544) -Member $administrator -Confirm:$False
-                Write-Log "Removed $($administrator.Name) from Local Administrators"
+                Write-CustomEventLog "removeOtherLocalAdmins set to True, removing $($administrator.Name) from Local Administrators"
+                $res = Remove-LocalGroupMember -Group (Get-LocalGroup -SID S-1-5-32-544) -Member $administrator -Confirm:$False
+                Write-CustomEventLog "Removed $($administrator.Name) from Local Administrators"
             }
         }
     }
 }catch{
-    Write-Log "Something went wrong while processing the local administrators group $($_)"
+    Write-CustomEventLog "Something went wrong while processing the local administrators group $($_)"
     Write-Error "Something went wrong while processing the local administrators group $($_)"
     Exit 0
 }
 
-if($newPwd){ #newly created admin
-    Write-Log "Password for $localAdminName set to a new value, see MDE"
-    Write-Host "Password set to $newPwd for $localAdminName"
+if((New-TimeSpan -Start $localAdmin.PasswordLastSet -End (Get-Date)).TotalDays -gt $maxDaysBetweenResets){
+    try{
+        Write-CustomEventLog "Setting password for $localAdminName ..."
+        $newPwd = Get-NewPassword $minimumPasswordLength
+        $res = $localAdmin | Set-LocalUser -Password $newPwd -Confirm:$False
+        Write-CustomEventLog "Password for $localAdminName set to a new value, see MDE"
+    }catch{
+        Write-CustomEventLog "Failed to set new password for $localAdminName"
+        Write-Error "Failed to set password for $localAdminName because of $($_)"
+        Exit 0
+    }
+}
+
+if($newPwd){
+    Set-Content $tempCache -Value $newPwd -Force -Confirm:$False
+    Write-Host "Password was reset by LeanLAPS"
+    Exit 1
+}else{
+    Write-Host "LeanLAPS is up to date"
     Exit 0
 }
-
-if((New-TimeSpan -Start $localAdmin.PasswordLastSet -End (Get-Date)).TotalDays -gt $maxDaysBetweenResets){
-    if($mode -eq "detect"){
-        Write-Log "restarting in remediate mode"
-        Exit 1
-    }
-    try{
-        Write-Log "Setting password for $localAdminName ..."
-        $newPwd = Get-NewPassword $minimumPasswordLength
-        $localAdmin | Set-LocalUser -Password $newPwd -Confirm:$False
-        Write-Log "Password for $localAdminName set to a new value, see MDE"
-        Write-Host "Password set to $newPwd for $localAdminName"
-        Exit 0
-    }catch{
-        Write-Log "Failed to set new password for $localAdminName"
-        Write-Error "Failed to set password for $localAdminName because of $($_)"
-        Exit 1
-    }
-}
-
-Write-Log "No remediation needed, LeanLAPS will exit"
-Exit 0

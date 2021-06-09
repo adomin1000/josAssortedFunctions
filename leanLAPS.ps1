@@ -1,4 +1,4 @@
-﻿<#
+<#
     .DESCRIPTION
     Local Admin Password Rotation and Account Management
     Set configuration values, and follow rollout instructions at https://www.lieben.nu/liebensraum/?p=3605
@@ -13,12 +13,10 @@
 #>
 
 ####CONFIG
-$maxDaysBetweenResets = 7
 $minimumPasswordLength = 21
 $localAdminName = "LCAdmin"
 $removeOtherLocalAdmins = $False
 $onlyRunOnWindows10 = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
-$tempCache = Join-Path $Env:TEMP -ChildPath "tempLCAdmin.crx"
 
 function Get-NewPassword($passwordLength){
    -join ('abcdefghkmnrstuvwxyzABCDEFGHKLMNPRSTUVWXYZ23456789'.ToCharArray() | Get-Random -Count $passwordLength)
@@ -43,20 +41,7 @@ if($onlyRunOnWindows10 -and [Environment]::OSVersion.Version.Major -ne 10){
 $mode = $MyInvocation.MyCommand.Name.Split(".")[0]
 $newPwd = $Null
 
-if($mode -eq "detect"){
-    if((Test-Path $tempCache)){
-        Write-CustomEventLog "Encrypted new password detected, outputting to MDE.."
-        try{
-            $pwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR((Get-Content $tempCache | ConvertTo-SecureString)))
-            Write-Host $pwd
-            $Null = Remove-Item -Path $tempCache -Force -Confirm:$False
-            Exit 0
-        }catch{
-            Write-Host "Failed to get new password"
-            Exit 1
-        }
-    }
-}else{
+if($mode -ne "detect"){
     Exit 0
 }
 
@@ -95,7 +80,7 @@ try{
     Exit 0
 }
 
-if((New-TimeSpan -Start $localAdmin.PasswordLastSet -End (Get-Date)).TotalDays -gt $maxDaysBetweenResets){
+if(!$newPwd){
     try{
         Write-CustomEventLog "Setting password for $localAdminName ..."
         $newPwd = Get-NewPassword $minimumPasswordLength
@@ -108,11 +93,5 @@ if((New-TimeSpan -Start $localAdmin.PasswordLastSet -End (Get-Date)).TotalDays -
     }
 }
 
-if($newPwd){
-    $res = Set-Content $tempCache -Value (ConvertFrom-SecureString (ConvertTo-SecureString $newPwd -asplaintext -force)) -Force -Confirm:$False
-    Write-Host "LeanLAPS generated a new password"
-    Exit 1
-}else{
-    Write-Host "LeanLAPS is up to date"
-    Exit 0
-}
+Write-Host "LeanLAPS set $($localAdminName)'s password to $newPwd"
+Exit 0

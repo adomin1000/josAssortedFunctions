@@ -1,4 +1,4 @@
-﻿<#
+<#
     .DESCRIPTION
     Local Admin Password Rotation and Account Management
     Set configuration values, and follow rollout instructions
@@ -76,13 +76,13 @@ try{
     }
 }catch{
     Write-Log "Something went wrong while processing the local administrators group $($_)"
-    Write-Output "Something went wrong while processing the local administrators group $($_)"
+    Write-Host "Something went wrong while processing the local administrators group $($_)"
     Exit 1
 }
 
 if($newPwd){ #newly created admin
     Write-Log "Password for $localAdminName set to a new value, see MDE"
-    Write-Output "Password set to $newPwd for $localAdminName"
+    Write-Host "Password set to $newPwd for $localAdminName"
     Exit 0
 }
 
@@ -96,11 +96,11 @@ if((New-TimeSpan -Start $localAdmin.PasswordLastSet -End (Get-Date)).TotalDays -
         $newPwd = Get-NewPassword $minimumPasswordLength
         $localAdmin | Set-LocalUser -Password $newPwd -Confirm:$False
         Write-Log "Password for $localAdminName set to a new value, see MDE"
-        Write-Output "Password set to $newPwd for $localAdminName"
+        Write-Host "Password set to $newPwd for $localAdminName"
         Exit 0
     }catch{
         Write-Log "Failed to set new password for $localAdminName"
-        Write-Output "Failed to set password for $localAdminName because of $($_)"
+        Write-Host "Failed to set password for $localAdminName because of $($_)"
         Exit 1
     }
 }

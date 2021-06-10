@@ -49,10 +49,11 @@ if($mode -ne "detect"){
     #$intuneLog2 = Join-Path $Env:ProgramData -childpath "Microsoft\IntuneManagementExtension\Logs\IntuneManagementExtension.log"
     Exit 0
 }else{
-    #check if marker file present, which means we're in the 2nd detection run where nothing should happen
+    #check if marker file present, which means we're in the 2nd detection run where nothing should happen except posting the new password to Intune
     if($markerFileExists){
+        $pwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR((Get-Content $markerFile | ConvertTo-SecureString)))
         Remove-Item -Path $markerFile -Force -Confirm:$False
-        Write-Host "Status: Actual"
+        Write-Host "LeanLAPS current password: $pwd for $($localAdminName), last changed on $(Get-Date)"
         Exit 0
     }
 }
@@ -107,6 +108,6 @@ if(!$pwdSet){
     }
 }
 
-Write-Host "LeanLAPS set password to $newPwd for $($localAdminName)"
-Set-Content -Path $markerFile -Value 1 -Force -Confirm:$False
+Write-Host "LeanLAPS ran successfully for $($localAdminName)"
+$res = Set-Content -Path $markerFile -Value (ConvertFrom-SecureString (ConvertTo-SecureString $newPwd -asplaintext -force)) -Force -Confirm:$False
 Exit 1

@@ -17,6 +17,8 @@ $minimumPasswordLength = 21
 $localAdminName = "LCAdmin"
 $removeOtherLocalAdmins = $False
 $onlyRunOnWindows10 = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
+$markerFile = Join-Path $Env:TEMP -ChildPath "leanLAPS.marker"
+$markerFileExists = (Test-Path $markerFile)
 
 function Get-NewPassword($passwordLength){
    -join ('abcdefghkmnrstuvwxyzABCDEFGHKLMNPRSTUVWXYZ23456789'.ToCharArray() | Get-Random -Count $passwordLength)
@@ -39,10 +41,20 @@ if($onlyRunOnWindows10 -and [Environment]::OSVersion.Version.Major -ne 10){
 }
 
 $mode = $MyInvocation.MyCommand.Name.Split(".")[0]
-$newPwd = $Null
+$pwdSet = $false
 
+#when in remediation mode, always exit successfully as we remediated during the detection phase
 if($mode -ne "detect"){
+    #$intuneLog1 = Join-Path $Env:ProgramData -childpath "Microsoft\IntuneManagementExtension\Logs\AgentExecutor.log"
+    #$intuneLog2 = Join-Path $Env:ProgramData -childpath "Microsoft\IntuneManagementExtension\Logs\IntuneManagementExtension.log"
     Exit 0
+}else{
+    #check if marker file present, which means we're in the 2nd detection run where nothing should happen
+    if($markerFileExists){
+        Remove-Item -Path $markerFile -Force -Confirm:$False
+        Write-Host "Status: Actual"
+        Exit 0
+    }
 }
 
 try{
@@ -50,7 +62,8 @@ try{
 }catch{
     Write-CustomEventLog "$localAdminName doesn't exist yet, creating..."
     $newPwd = Get-NewPassword $minimumPasswordLength
-    $localAdmin = New-LocalUser -PasswordNeverExpires $True -AccountNeverExpires -Name $localAdminName -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force)
+    $pwdSet = $True
+    $localAdmin = New-LocalUser -PasswordNeverExpires $True -AccountNeverExpires $True -Name $localAdminName -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force)
     Write-CustomEventLog "$localAdminName created"
 }
 
@@ -76,22 +89,24 @@ try{
     }
 }catch{
     Write-CustomEventLog "Something went wrong while processing the local administrators group $($_)"
-    Write-Error "Something went wrong while processing the local administrators group $($_)"
+    Write-Host "Something went wrong while processing the local administrators group $($_)"
     Exit 0
 }
 
-if(!$newPwd){
+if(!$pwdSet){
     try{
         Write-CustomEventLog "Setting password for $localAdminName ..."
         $newPwd = Get-NewPassword $minimumPasswordLength
+        $pwdSet = $True
         $res = $localAdmin | Set-LocalUser -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force) -Confirm:$False
         Write-CustomEventLog "Password for $localAdminName set to a new value, see MDE"
     }catch{
         Write-CustomEventLog "Failed to set new password for $localAdminName"
-        Write-Error "Failed to set password for $localAdminName because of $($_)"
+        Write-Host "Failed to set password for $localAdminName because of $($_)"
         Exit 0
     }
 }
 
-Write-Host "LeanLAPS set $($localAdminName)'s password to $newPwd"
-Exit 0
+Write-Host "LeanLAPS set password to $newPwd for $($localAdminName)"
+Set-Content -Path $markerFile -Value 1 -Force -Confirm:$False
+Exit 1

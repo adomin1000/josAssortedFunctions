@@ -63,7 +63,7 @@ try{
     Write-CustomEventLog "$localAdminName doesn't exist yet, creating..."
     $newPwd = Get-NewPassword $minimumPasswordLength
     $pwdSet = $True
-    $localAdmin = New-LocalUser -PasswordNeverExpires $True -AccountNeverExpires $True -Name $localAdminName -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force)
+    $localAdmin = New-LocalUser -PasswordNeverExpires -AccountNeverExpires $True -Name $localAdminName -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force)
     Write-CustomEventLog "$localAdminName created"
 }
 

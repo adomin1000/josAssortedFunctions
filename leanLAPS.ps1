@@ -61,13 +61,21 @@ if($mode -ne "detect"){
 }
 
 try{
+    $localAdmin = $Null
     $localAdmin = Get-LocalUser -name $localAdminName -ErrorAction Stop
+    if(!$localAdmin){Throw}
 }catch{
     Write-CustomEventLog "$localAdminName doesn't exist yet, creating..."
-    $newPwd = Get-NewPassword $minimumPasswordLength
-    $pwdSet = $True
-    $localAdmin = New-LocalUser -PasswordNeverExpires -AccountNeverExpires -Name $localAdminName -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force)
-    Write-CustomEventLog "$localAdminName created"
+    try{
+        $newPwd = Get-NewPassword $minimumPasswordLength
+        $pwdSet = $True
+        $localAdmin = New-LocalUser -PasswordNeverExpires -AccountNeverExpires -Name $localAdminName -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force)
+        Write-CustomEventLog "$localAdminName created"
+    }catch{
+        Write-CustomEventLog "Something went wrong while provisioning $localAdminName $($_)"
+        Write-Host "Something went wrong while provisioning $localAdminName $($_)"
+        Exit 0
+    }
 }
 
 try{

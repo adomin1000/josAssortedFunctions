@@ -34,6 +34,14 @@ Function Write-CustomEventLog($Message){
 
 Write-CustomEventLog "LeanLAPS starting on $($ENV:COMPUTERNAME) as $($MyInvocation.MyCommand.Name)"
 
+#wipe any passwords from intune logs
+try{
+    $intuneLog1 = Join-Path $Env:ProgramData -childpath "Microsoft\IntuneManagementExtension\Logs\AgentExecutor.log"
+    $intuneLog2 = Join-Path $Env:ProgramData -childpath "Microsoft\IntuneManagementExtension\Logs\IntuneManagementExtension.log"
+    Set-Content -Force -Confirm:$False -Path $intuneLog1 -Value (Get-Content -Path $intuneLog1 | Select-String -Pattern "Password" -NotMatch)
+    Set-Content -Force -Confirm:$False -Path $intuneLog2 -Value (Get-Content -Path $intuneLog2 | Select-String -Pattern "Password" -NotMatch)
+}catch{$Null}
+
 if($onlyRunOnWindows10 -and [Environment]::OSVersion.Version.Major -ne 10){
     Write-CustomEventLog "Unsupported OS!"
     Write-Error "Unsupported OS!"
@@ -45,8 +53,6 @@ $pwdSet = $false
 
 #when in remediation mode, always exit successfully as we remediated during the detection phase
 if($mode -ne "detect"){
-    #$intuneLog1 = Join-Path $Env:ProgramData -childpath "Microsoft\IntuneManagementExtension\Logs\AgentExecutor.log"
-    #$intuneLog2 = Join-Path $Env:ProgramData -childpath "Microsoft\IntuneManagementExtension\Logs\IntuneManagementExtension.log"
     Exit 0
 }else{
     #check if marker file present, which means we're in the 2nd detection run where nothing should happen except posting the new password to Intune

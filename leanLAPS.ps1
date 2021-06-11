@@ -80,20 +80,22 @@ try{
 
 try{
     $administratorsGroupName = (New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-544")).Translate([System.Security.Principal.NTAccount]).Value.Split("\")[1]
+    Write-CustomEventLog "local administrators group is called $administratorsGroupName"
     $group = gwmi win32_group -filter "Name = `"$($administratorsGroupName)`""
     $administrators = $group.GetRelated('Win32_UserAccount')
+    Write-CustomEventLog "There are $($administrators.count) readable accounts in $administratorsGroupName"
 
     if($administrators.SID -notcontains $($localAdmin.SID.Value)){
-        Write-CustomEventLog "$localAdminName is not a local administrator, adding..."
-        $res = Add-LocalGroupMember -Group (Get-LocalGroup -SID S-1-5-32-544) -Member $localAdmin -Confirm:$False -ErrorAction Stop
-        Write-CustomEventLog "Added $localAdminName to the local administrators group"
+        Write-CustomEventLog "$($localAdmin.Name) is not a local administrator, adding..."
+        $res = Add-LocalGroupMember -Group $administratorsGroupName -Member $localAdmin.SID.Value -Confirm:$False -ErrorAction Stop
+        Write-CustomEventLog "Added $($localAdmin.Name) to the local administrators group"
     }
     #remove other local admins if specified, only executes if adding the new local admin succeeded
     if($removeOtherLocalAdmins){
         foreach($administrator in $administrators){
             if($administrator.SID -ne $localAdmin.SID.Value){
                 Write-CustomEventLog "removeOtherLocalAdmins set to True, removing $($administrator.Name) from Local Administrators"
-                $res = Remove-LocalGroupMember -Group (Get-LocalGroup -SID S-1-5-32-544) -Member $administrator -Confirm:$False
+                $res = Remove-LocalGroupMember -Group $administratorsGroupName -Member $administrator.SID -Confirm:$False
                 Write-CustomEventLog "Removed $($administrator.Name) from Local Administrators"
             }
         }

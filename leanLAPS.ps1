@@ -85,7 +85,7 @@ try{
     $administrators = $group.GetRelated('Win32_UserAccount')
     Write-CustomEventLog "There are $($administrators.count) readable accounts in $administratorsGroupName"
 
-    if($administrators.SID -notcontains $($localAdmin.SID.Value)){
+    if(!$administrators -or $administrators.SID -notcontains $($localAdmin.SID.Value)){
         Write-CustomEventLog "$($localAdmin.Name) is not a local administrator, adding..."
         $res = Add-LocalGroupMember -Group $administratorsGroupName -Member $localAdmin.SID.Value -Confirm:$False -ErrorAction Stop
         Write-CustomEventLog "Added $($localAdmin.Name) to the local administrators group"
@@ -99,6 +99,8 @@ try{
                 Write-CustomEventLog "Removed $($administrator.Name) from Local Administrators"
             }
         }
+    }else{
+        Write-CustomEventLog "removeOtherLocalAdmins set to False, not removing any administrator permissions"
     }
 }catch{
     Write-CustomEventLog "Something went wrong while processing the local administrators group $($_)"

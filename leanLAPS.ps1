@@ -81,7 +81,7 @@ try{
 try{
     $administratorsGroupName = (New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-544")).Translate([System.Security.Principal.NTAccount]).Value.Split("\")[1]
     Write-CustomEventLog "local administrators group is called $administratorsGroupName"
-    $group = [ADSI]::new("WinNT://$env:COMPUTERNAME/$administratorsGroupName")
+    $group = [ADSI]::new("WinNT://$($env:COMPUTERNAME)/$($administratorsGroupName),Group")
     $administrators = $group.Invoke('Members') | % {([ADSI]$_).Path.Split("/")[-1]}
 
     Write-CustomEventLog "There are $($administrators.count) readable accounts in $administratorsGroupName"

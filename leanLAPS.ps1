@@ -2,6 +2,8 @@
     .DESCRIPTION
     Local Admin Password Rotation and Account Management
     Set configuration values, and follow rollout instructions at https://www.lieben.nu/liebensraum/?p=3605
+
+    Not testing in hybrid scenario's. Should work, but may conflict with e.g. specific password policies.
   
     .NOTES
     filename:       leanLAPS.ps1
@@ -15,7 +17,7 @@
 ####CONFIG
 $minimumPasswordLength = 21
 $localAdminName = "LCAdmin"
-$removeOtherLocalAdmins = $False
+$removeOtherLocalAdmins = $False #if set to True, will remove ALL other local admins, including those set through AzureAD device settings
 $onlyRunOnWindows10 = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
 $markerFile = Join-Path $Env:TEMP -ChildPath "leanLAPS.marker"
 $markerFileExists = (Test-Path $markerFile)

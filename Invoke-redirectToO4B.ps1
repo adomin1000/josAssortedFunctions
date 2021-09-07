@@ -1,4 +1,4 @@
-﻿#Module name:      Invoke-O4BAutoMount
+﻿#Module name:      Invoke-redirectToO4B
 #Author:           Jos Lieben
 #Author Blog:      https://www.lieben.nu
 #Date:             31-08-2021
@@ -6,7 +6,7 @@
 #Purpose:          Redirect any folder to any location on a users (mounted) Onedrive for Business
 #Requirements:     Windows 10 build 1803, Onedrive preinstalled / configured (see my blog for instructions on fully automating that)
 
-$LogPath = $($env:temp) + "\Invoke-O4BAutoMount.log"
+$LogPath = $($env:temp) + "\Invoke-redirectToO4B.log"
 Start-Transcript $LogPath
 
 #redirection information is read from the registry. Each desired redirection should be a Key under HKLM:\SOFTWARE\Lieben Consultancy\O4BAM\Redirections

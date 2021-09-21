@@ -327,9 +327,9 @@ if($runningAsSystem){
     start-process "c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe" -WindowStyle Hidden -ArgumentList "`$slept = 0;`$script:refreshNeeded = `$false;`$sysevent = [microsoft.win32.systemevents];Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnding`" -Action {`$script:refreshNeeded = `$true;};Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionEnded`"  -Action {`$script:refreshNeeded = `$true;};Register-ObjectEvent -InputObject `$sysevent -EventName `"SessionSwitch`"  -Action {`$script:refreshNeeded = `$true;};while(`$true){;`$slept += 0.2;if((`$slept -gt ($autoRerunMinutes*60) -and $autoRerunMinutes -ne 0) -or `$script:refreshNeeded){;`$slept=0;`$script:refreshNeeded=`$False;Remove-Item $regPath -Force -Confirm:`$False -ErrorAction SilentlyContinue;Restart-Service -Name IntuneManagementExtension -Force;Exit;};Start-Sleep -m 200;};"    
     
     #set removal key in case computer crashes or something like that
-    $runOnceEntries = (Get-ItemProperty -path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce")
-    if([Array]@($runOnceEntries.PSObject.Properties.Name | % {if($runOnceEntries.$_ -eq "reg delete $regPath /f"){$_}}).Count -le 0){
-        New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name $(Get-Random) -Value "reg delete $regPath /f" -PropertyType String -Force -ErrorAction SilentlyContinue
+    [Array]$runOnceEntries = @(Get-ItemProperty -path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce")
+    if(([Array]@($runOnceEntries.PSObject.Properties.Name | % {if($runOnceEntries.$_ -eq "reg delete $($regPath.Replace(':','')) /f"){$_}})).Count -le 0){
+        New-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" -Name $(Get-Random) -Value "reg delete $($regPath.Replace(':','')) /f" -PropertyType String -Force -ErrorAction SilentlyContinue
     }
     start-sleep -s 10
     Exit

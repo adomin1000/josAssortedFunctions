@@ -7,12 +7,12 @@ run a lot faster in a single thread and to automatically and fully report on all
 It will use device based login to get all groups+members in your tenant, but you can switch this to SPN/cert or secret based if you want to e.g. schedule this script.
 
 .NOTES
-filename:       get-SPOPermissions.ps1
-author:         Jos Lieben (Lieben Consultancy)
-created:        09/09/2021
-last updated:   09/09/2021
-copyright:      2021, Jos Lieben, Lieben Consultancy, free to use and distribute
-credits:        Salaudeen Rajack for the base script
+filename:           get-SPOPermissions.ps1
+author:             Jos Lieben (Lieben Consultancy)
+created:            09/09/2021
+last updated:       09/09/2021
+Copyright/License:  https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
+credits:            Salaudeen Rajack for the base script
 
 Before running this script, your account will need to have administrative rights to all sites you wish to audit. This can be assigned (without removing existing permissions) using:
 

@@ -6,12 +6,12 @@
     Not testing in hybrid scenario's. Should work, but may conflict with e.g. specific password policies.
   
     .NOTES
-    filename:       leanLAPS.ps1
-    author:         Jos Lieben (Lieben Consultancy)
-    created:        09/06/2021
-    last updated:   23/09/2021
-    Copyright:      https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author)
-    inspired by:    Rudy Ooms; https://call4cloud.nl/2021/05/the-laps-reloaded/
+    filename:               leanLAPS.ps1
+    author:                 Jos Lieben (Lieben Consultancy)
+    created:                09/06/2021
+    last updated:           23/09/2021
+    #Copyright/License:     https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
+    inspired by:            Rudy Ooms; https://call4cloud.nl/2021/05/the-laps-reloaded/
 #>
 
 ####CONFIG

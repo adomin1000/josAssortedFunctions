@@ -1,10 +1,10 @@
-﻿#Module name:      Invoke-asIntuneLogonScript
-#Author:           Jos Lieben
-#Author Blog:      http://www.lieben.nu
-#Date:             11-06-2019
-#Purpose:          Using this code in ANY Intune script 
-#Requirements:     Windows 10 build 1803 or higher
-#License:          Free to use and modify non-commercially, leave headers intact. For commercial use, contact me
+﻿#Module name:           Invoke-asIntuneLogonScript
+#Author:                Jos Lieben
+#Author Blog:           http://www.lieben.nu
+#Date:                  11-06-2019
+#Purpose:               Using this code in ANY Intune script 
+#Requirements:          Windows 10 build 1803 or higher
+#Copyright/License:     https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
 #Thanks to:
 #@michael_mardahl for the idea to remove the script from the registry so it automatically reruns
 #@Justin Murray for a .NET example of how to impersonate a logged in user

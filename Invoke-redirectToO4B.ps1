@@ -1,10 +1,10 @@
-﻿#Module name:      Invoke-redirectToO4B
-#Author:           Jos Lieben
-#Author Blog:      https://www.lieben.nu
-#Date:             31-08-2021
-#License:          Free to use and modify non-commercially, leave headers intact. 
-#Purpose:          Redirect any folder to any location on a users (mounted) Onedrive for Business
-#Requirements:     Windows 10 build 1803, Onedrive preinstalled / configured (see my blog for instructions on fully automating that)
+﻿#Module name:       Invoke-redirectToO4B
+#Author:            Jos Lieben
+#Author Blog:       https://www.lieben.nu
+#Date:              31-08-2021
+#Copyright/License: https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
+#Purpose:           Redirect any folder to any location on a users (mounted) Onedrive for Business
+#Requirements:      Windows 10 build 1803, Onedrive preinstalled / configured (see my blog for instructions on fully automating that)
 
 $LogPath = $($env:temp) + "\Invoke-redirectToO4B.log"
 Start-Transcript $LogPath

@@ -1,10 +1,10 @@
-﻿#Module name:      Invoke-O4BAutoMount
-#Author:           Jos Lieben
-#Author Blog:      http://www.lieben.nu
-#Date:             18-06-2019
-#License:          Free to use and modify non-commercially, leave headers intact. For commercial use, contact me or my employer
-#Purpose:          Configure Onedrive for Business and optionally mount a number of teamsites (or SpO sites) and redirect any folder to ANY of those locations
-#Requirements:     Windows 10 build 1803, Onedrive preinstalled / configured (see my blog for instructions on fully automating that)
+﻿#Module name:           Invoke-O4BAutoMount
+#Author:                Jos Lieben
+#Author Blog:           http://www.lieben.nu
+#Date:                  18-06-2019
+#Copyright/License:     https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
+#Purpose:               Configure Onedrive for Business and optionally mount a number of teamsites (or SpO sites) and redirect any folder to ANY of those locations
+#Requirements:          Windows 10 build 1803, Onedrive preinstalled / configured (see my blog for instructions on fully automating that)
 #Thanks to:
 #@michael_mardahl for the ODOPEN example and the idea to remove the script from the registry so it automatically reruns
 #@Justin Murray for a .NET example of how to impersonate a logged in user

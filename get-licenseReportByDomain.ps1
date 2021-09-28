@@ -130,6 +130,7 @@ foreach($user in $users){
     }
 }
 
+write-output "license information retrieved" 
 
 $byDomainsOutputArray = @()
 foreach($key in $byDomains.Keys){
@@ -139,6 +140,8 @@ foreach($key in $byDomains.Keys){
     }
     $byDomainsOutputArray += $obj
 }
+
+Write-Output "licensed parsed, sending mail..."
 
 $htmlTable = $byDomainsOutputArray | ConvertTo-Html -As Table
 
@@ -159,3 +162,5 @@ $body = @{
 }
 
 Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$sentFromUPN/sendMail" -Method POST -Headers $graphHeaders -Body ($body | convertto-json -depth 10) -ContentType "application/json"
+
+Write-Output "Mail sent, script has completed"

@@ -116,7 +116,7 @@ if(!$pwdSet){
         Write-CustomEventLog "Setting password for $localAdminName ..."
         $newPwd = Get-NewPassword $minimumPasswordLength
         $pwdSet = $True
-        $res = $localAdmin | Set-LocalUser -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force) -Confirm:$False
+        $res = $localAdmin | Set-LocalUser -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force) -Confirm:$False -AccountNeverExpires -PasswordNeverExpires $True -UserMayChangePassword $True
         Write-CustomEventLog "Password for $localAdminName set to a new value, see MDE"
     }catch{
         Write-CustomEventLog "Failed to set new password for $localAdminName"

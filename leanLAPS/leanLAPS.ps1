@@ -70,8 +70,9 @@ try{
     Write-CustomEventLog "$localAdminName doesn't exist yet, creating..."
     try{
         $newPwd = Get-NewPassword $minimumPasswordLength
+        $newPwdSecStr = $newPwd | ConvertTo-SecureString -AsPlainText -Force
         $pwdSet = $True
-        $localAdmin = New-LocalUser -PasswordNeverExpires -AccountNeverExpires -Name $localAdminName -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force)
+        $localAdmin = New-LocalUser -PasswordNeverExpires -AccountNeverExpires -Name $localAdminName -Password $newPwdSecStr
         Write-CustomEventLog "$localAdminName created"
     }catch{
         Write-CustomEventLog "Something went wrong while provisioning $localAdminName $($_)"
@@ -115,8 +116,9 @@ if(!$pwdSet){
     try{
         Write-CustomEventLog "Setting password for $localAdminName ..."
         $newPwd = Get-NewPassword $minimumPasswordLength
+        $newPwdSecStr = ConvertTo-SecureString $newPwd -asplaintext -force
         $pwdSet = $True
-        $res = $localAdmin | Set-LocalUser -Password ($newPwd | ConvertTo-SecureString -AsPlainText -Force) -Confirm:$False -AccountNeverExpires -PasswordNeverExpires $True -UserMayChangePassword $True
+        $res = $localAdmin | Set-LocalUser -Password $newPwdSecStr -Confirm:$False -AccountNeverExpires -PasswordNeverExpires $True -UserMayChangePassword $True
         Write-CustomEventLog "Password for $localAdminName set to a new value, see MDE"
     }catch{
         Write-CustomEventLog "Failed to set new password for $localAdminName"
@@ -126,5 +128,5 @@ if(!$pwdSet){
 }
 
 Write-Host "LeanLAPS ran successfully for $($localAdminName)"
-$res = Set-Content -Path $markerFile -Value (ConvertFrom-SecureString (ConvertTo-SecureString $newPwd -asplaintext -force)) -Force -Confirm:$False
+$res = Set-Content -Path $markerFile -Value (ConvertFrom-SecureString $newPwdSecStr) -Force -Confirm:$False
 Exit 1

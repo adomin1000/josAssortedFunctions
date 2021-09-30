@@ -11,9 +11,9 @@ last updated:       28/09/2021
 Copyright/License:  https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
 
 Before this runbook, make sure you assign the correct rights to the managed identity of your automation account:
-required Graph Permissions (application level): (Organization.Read.All AND User.Read.All) OR Directory.Read.All
+required MS Graph Permissions (application level): (Organization.Read.All AND User.Read.All AND Mail.Send) OR (Directory.Read.All AND Mail.Send)
 
-assign using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
+assign MS Graph Rights to a Managed Identity using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
 
 #>
 #Requires -modules Az.Accounts
@@ -103,19 +103,22 @@ while($rawUsers.'@odata.nextLink'){
 Write-Output "Users retrieved, retrieving license information for each user"
 $byDomains = @{}
 
-foreach($user in $users){
-    $lics = (New-RetryCommand -Command 'Invoke-RestMethod' -Arguments @{Uri = "https://graph.microsoft.com/v1.0/users/$($user.id)/licenseDetails"; Method = "GET"; Headers = $graphHeaders; ErrorAction = "Stop"}).value
+for($u=0;$u -lt $users.Count;$u++){
+    if($u -gt 0 -and $u % 100 -eq 0){
+        Write-Output "Checked $u of $($users.Count) users"
+    }
+    $lics = (New-RetryCommand -Command 'Invoke-RestMethod' -Arguments @{Uri = "https://graph.microsoft.com/v1.0/users/$($users[$u].id)/licenseDetails"; Method = "GET"; Headers = $graphHeaders; ErrorAction = "Stop"}).value
     #skip users without licenses
     if(!$lics -or $lics.Count -eq 0){
         continue
     }
     try{
-        $domain = $user.mail.Split("@")[1]
+        $domain = $users[$u].mail.Split("@")[1]
         if(!$domain){
             Throw
         }
     }catch{
-        $domain = $user.UserPrincipalName.Split("@")[1]
+        $domain = $users[$u].UserPrincipalName.Split("@")[1]
     }
 
     if(!$byDomains.$domain){
@@ -140,6 +143,25 @@ foreach($key in $byDomains.Keys){
     }
     $byDomainsOutputArray += $obj
 }
+
+$totals = @{}
+foreach($header in $headers){
+    $totals.$header = 0
+}
+
+foreach($domain in $byDomainsOutputArray){
+    foreach($header in $headers){
+        $totals.$header += $domain.$header
+    }
+}
+
+$obj = [PSCustomObject]@{"domain"="Total"}
+
+foreach($header in $headers){
+    $obj | Add-Member -MemberType NoteProperty -Name $header -Value $totals.$header
+}
+
+$byDomainsOutputArray+=$obj
 
 Write-Output "licensed parsed, sending mail..."
 

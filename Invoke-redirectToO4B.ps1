@@ -292,7 +292,7 @@ $userEmail = $Null
 foreach($redirection in $listOfFoldersToRedirect){
     $parsedTarget = Invoke-Expression "`"$($redirection.target)`"" -ErrorAction Stop
     $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath $parsedTarget
-
+    $failed = $False
     Write-Output "redirecting $($redirection.source) to $($redirection.target) (under onedrive)"
     if($KnownFolders.$($redirection.source)){
         try{
@@ -301,6 +301,7 @@ foreach($redirection in $listOfFoldersToRedirect){
         }catch{
             Write-Output "Failed to redirect special folder $($redirection.source) to $targetPath"
             $_
+            $failed = $True
         }
     }else{
         try{
@@ -310,10 +311,34 @@ foreach($redirection in $listOfFoldersToRedirect){
         }catch{
             Write-Output "Failed to redirect custom path $($redirection.source) to $targetPath"
             $_
+            $failed = $True
         }
+    }
+    if($failed){
+        $overallStatus = $False
+        New-ItemProperty -Path $statusRootPath -Name $redirection.source -Value "Failed" -Force | Out-Null
+    }else{
+        New-ItemProperty -Path $statusRootPath -Name $redirection.source -Value "Completed" -Force | Out-Null
     }
 }
 
-Write-Output "Scrip completed"
+if($overallStatus){
+    New-ItemProperty -Path $statusRootPath -Name "Overall" -Value "Completed" -Force | Out-Null
+}else{
+    New-ItemProperty -Path $statusRootPath -Name "Overall" -Value "Failed" -Force | Out-Null
+}
+
+Write-Output "Creating / checking existence of hidden log folder in user Onedrive"
+$targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath "OnedriveFolderRedirect (do not delete)"
+
+if(!(Test-Path -Path $targetPath)){
+    New-Item -Path $targetPath -Force -ItemType Directory -Confirm:$False | Out-Null
+}
+
+Write-Output "Main script completed, stopping log stream before moving log file to $targetPath"
 
 Stop-Transcript
+
+Move-Item -Path $LogPath -Destination (Join-Path -Path $targetPath -ChildPath "$(Get-Date -format "dd-MM-yyyy-HH-mm")-Invoke-redirectToO4B.log") -Force -Confirm:$False
+New-ItemProperty -Path (Split-Path $statusRootPath -parent) -Name "Logpath" -Value (Join-Path -Path $targetPath -ChildPath "$(Get-Date -format "dd-MM-yyyy-HH-mm")-Invoke-redirectToO4B.log") -Force | Out-Null
+Write-Output "Finished"

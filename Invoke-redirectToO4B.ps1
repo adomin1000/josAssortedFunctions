@@ -150,26 +150,39 @@ Function Redirect-Folder {
 
     $Folder = Get-KnownFolderPath -KnownFolder $source
     If ($Folder -ne $target) {
-        Set-KnownFolderPath -KnownFolder $source -Path $target
+	    If (!(Test-Path $target -PathType Container)) {
+		    New-Item -Path $target -Type Directory -Force -Verbose
+        }
         if($Folder -and (Test-Path $Folder -PathType Container) -and (Test-Path $target -PathType Container)){
             try{
                 if($existingDataAction -eq "copy"){
                     Write-Output "Copying original files from source to destination"
-                    Get-ChildItem -Path $Folder -ErrorAction Stop | Copy-Item -Destination $target -Recurse -Container -Force -Confirm:$False -ErrorAction Stop
+                    Get-ChildItem -Path $Folder -ErrorAction Stop | % {
+                        Copy-Item -Path $_.FullName -Destination $target -Recurse -Container -Force -Confirm:$False -ErrorAction Stop
+                        Write-Output "Copied $($_.FullName) to $target"
+                    }
                 }
                 if($existingDataAction -eq "move"){
                     Write-Output "Moving original files from source to destination"
-                    Get-ChildItem -Path $Folder -ErrorAction Stop | Move-Item -Destination $target -Force -Confirm:$False -ErrorAction Stop
+                    Get-ChildItem -Path $Folder -ErrorAction Stop | %{
+                        Move-Item -Path $_.FullName -Destination $target -Force -Confirm:$False -ErrorAction Stop
+                        Write-Output "Moved $($_.FullName) to $target"
+                    }
                 }
                 if($existingDataAction -eq "delete"){
                     Write-Output "Deleting original files in source"
-                    Get-ChildItem -Path $Folder -ErrorAction Stop | Remove-Item -Recurse -Force -Confirm:$False -ErrorAction Stop
+                    Get-ChildItem -Path $Folder -ErrorAction Stop | % {
+                        Remove-Item -Path $_.FullName -Recurse -Force -Confirm:$False -ErrorAction Stop
+                        Write-Output "Removed $($_.FullName)"
+                    }
                 }
                 Write-Output "Operation succeeded"
             }catch{
                 Throw $_
             }
         }
+
+        Set-KnownFolderPath -KnownFolder $source -Path $target
 
         if($hideSource -eq 1 -and $Folder){
             Attrib +h $Folder
@@ -211,7 +224,10 @@ Function Redirect-SpecialFolder {
         if($existingDataAction -eq "copy" -or $existingDataAction -eq "move"){
             Write-Output "Moving original files from source to destination"
             try{
-                Get-ChildItem -Path $source -ErrorAction Stop | Move-Item -Destination $target -Force -Confirm:$False -ErrorAction Stop
+                Get-ChildItem -Path $source -ErrorAction Stop | % {
+                    Move-Item -Path $_.FullName -Destination $target -Force -Confirm:$False -ErrorAction Stop
+                    Write-Output "Moved $($_.FullName) to $target"
+                }
             }catch{
                 Throw $_
             }

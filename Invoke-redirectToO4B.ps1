@@ -1,13 +1,14 @@
 ﻿#Module name:       Invoke-redirectToO4B
 #Author:            Jos Lieben
 #Author Blog:       https://www.lieben.nu
-#Date:              31-08-2021
+#Created:           31-08-2021
+#Updated:           14-10-2021
 #Copyright/License: https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
 #Purpose:           Redirect any folder to any location on a users (mounted) Onedrive for Business
 #Requirements:      Windows 10 build 1803, Onedrive preinstalled / configured (see my blog for instructions on fully automating that)
 
 $LogPath = $($env:temp) + "\Invoke-redirectToO4B.log"
-Start-Transcript $LogPath
+Start-Transcript $LogPath -Append
 
 #redirection information is read from the registry. Each desired redirection should be a Key under HKLM:\SOFTWARE\Lieben Consultancy\O4BAM\Redirections
 #each key should have the following values
@@ -46,6 +47,21 @@ foreach($key in Get-ChildItem -Path $rootPath){
     $listOfFoldersToRedirect += $folder
 }
 
+$overallStatus = $True
+$statusRootPath = "HKCU:\SOFTWARE\Lieben Consultancy\O4BAM\Status"
+#ensure a status registry key exists to nest results under for each user
+if(!(Test-Path $statusRootPath)){
+    New-Item $statusRootPath -Force | Out-Null
+    New-ItemProperty -Path $statusRootPath -Name "Overall" -Value "Started" -Force | Out-Null
+}
+
+#write initial status (started) to registry keys under each user
+foreach($folderToRedirect in $listOfFoldersToRedirect){
+    if(!(Test-Path (Join-Path $statusRootPath -ChildPath $folderToRedirect.source))){
+        New-ItemProperty -Path $statusRootPath -Name $folderToRedirect.source -Value "Started" -Force | Out-Null
+    }
+}
+
 if($Env:USERPROFILE.EndsWith("system32\config\systemprofile")){
     Write-Output "Running as SYSTEM, this script should run in user context!"
     Exit
@@ -63,8 +79,6 @@ try{
 }catch{
     Throw $_
 }
-
-$scriptPath = $PSCommandPath
 
 $KnownFolders = @{
     'AdminTools' = '724EF170-A42D-4FEF-9F26-B60E846FBA4F';'ApplicationData'='3EB685DB-65F9-4CF6-A03A-E3EF65729F3D';'CommonApplicationData'='62AB5D82-FDC1-4DC3-A9DD-070D1D495D97';
@@ -119,7 +133,7 @@ Function Get-KnownFolderPath {
             [Parameter(Mandatory = $true)][string]$KnownFolder
     )
     if($KnownFolder -eq "Downloads"){
-        Return $Null
+        Return (New-Object -ComObject Shell.Application).NameSpace('shell:Downloads').Self.Path
     }else{
         Return [Environment]::GetFolderPath($KnownFolder)
     }

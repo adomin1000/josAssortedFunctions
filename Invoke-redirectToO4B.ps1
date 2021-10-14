@@ -23,6 +23,10 @@ if(!$Env:USERPROFILE.EndsWith("system32\config\systemprofile")){$upn = $(whoami 
 #retrieve desired redirections from the registry
 $listOfFoldersToRedirect = @()
 $rootPath = "HKLM:\SOFTWARE\Lieben Consultancy\O4BAM\Redirections"
+if(!(Test-Path $rootPath)){
+    Throw "No redirections have been configured in the registry at $rootPath"
+}
+
 foreach($key in Get-ChildItem -Path $rootPath){
     $regData = Get-ItemProperty -Path $key.PSPath
     $folder = [PSCustomObject]@{

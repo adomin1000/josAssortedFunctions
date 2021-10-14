@@ -18,8 +18,6 @@ Start-Transcript $LogPath -Append
 #setEnvironmentVariable           ==> Set to 1 if you want the script to register a %ENV% type variable with Windows to point to the new location. Only works for well known folders in the list above
 #hideSource                       ==> Set to 1 to hide the source folder after redirection succeeds, 0 to do nothing. Only works for standard folders.
 
-if(!$Env:USERPROFILE.EndsWith("system32\config\systemprofile")){$upn = $(whoami /upn)}
-
 #retrieve desired redirections from the registry
 $listOfFoldersToRedirect = @()
 $rootPath = "HKLM:\SOFTWARE\Lieben Consultancy\O4BAM\Redirections"
@@ -227,12 +225,12 @@ Function Redirect-SpecialFolder {
     if((Test-Path $source)){
         if($existingDataAction -eq "copy" -or $existingDataAction -eq "move"){
             Write-Output "Moving original files from source to destination"
-            try{
+            Try{
                 Get-ChildItem -Path $source -ErrorAction Stop | % {
                     Move-Item -Path $_.FullName -Destination $target -Force -Confirm:$False -ErrorAction Stop
                     Write-Output "Moved $($_.FullName) to $target"
                 }
-            }catch{
+            }Catch{
                 Throw $_
             }
             Write-Output "Original files moved"
@@ -337,6 +335,7 @@ $targetPath = Join-Path -Path $odAccount.GetValue("UserFolder") -ChildPath "Oned
 
 if(!(Test-Path -Path $targetPath)){
     New-Item -Path $targetPath -Force -ItemType Directory -Confirm:$False | Out-Null
+    Attrib +h $targetPath 
 }
 
 Write-Output "Main script completed, stopping log stream before moving log file to $targetPath"

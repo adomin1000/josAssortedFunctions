@@ -171,7 +171,7 @@ Function Redirect-Folder {
             }
         }
 
-        if($hideSource -eq 1){
+        if($hideSource -eq 1 -and $Folder){
             Attrib +h $Folder
         }
     }

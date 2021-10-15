@@ -2,7 +2,7 @@
 #Author:            Jos Lieben
 #Author Blog:       https://www.lieben.nu
 #Created:           31-08-2021
-#Updated:           14-10-2021
+#Updated:           15-10-2021
 #Copyright/License: https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
 #Purpose:           Redirect any folder to any location on a users (mounted) Onedrive for Business
 #Requirements:      Windows 10 build 1803, Onedrive preinstalled / configured (see my blog for instructions on fully automating that)
@@ -14,10 +14,19 @@ Start-Transcript $LogPath -Append
 #each key should have the following values
 #source                           ==> Custom path (you can use PS Env vars or other code here) or choose from: 'AdminTools','ApplicationData','CommonApplicationData','CommonDesktopDirectory','CommonDocuments','CommonMusic','CommonPictures','CommonProgramFiles','CommonProgramFilesX86','CommonPrograms','CommonStartMenu','CommonStartup','CommonVideos','Cookies','Downloads','Desktop','Favorites','Fonts','History','InternetCache','LocalApplicationData','LocalizedResources','MyComputer','MyDocuments','MyMusic','MyPictures','MyVideos','NetworkShortcuts','PrinterShortcuts','ProgramFiles','ProgramFilesX86','Programs','Recent','Resources','SendTo','StartMenu','Startup','System','SystemX86','UserProfile','Windows'
 #target                           ==> you can choose a subfolder (or subfolder path) to redirect to in the targetted location, you can also use PS code here to e.g. make user specific folders
-#existingDataAction               ==> Allowed values: copy, move, delete, none
+#existingDataAction               ==> Allowed values: copy, move, delete, migrate
 #setEnvironmentVariable           ==> Set to 1 if you want the script to register a %ENV% type variable with Windows to point to the new location. Only works for well known folders in the list above
 #hideSource                       ==> Set to 1 to hide the source folder after redirection succeeds, 0 to do nothing. Only works for standard folders.
 
+<#existingDataAction explanation:
+
+When a known system folder such as My Documents, Desktop etc is redirected, existing data can be copied, moved or deleted. When this is done, the folder is redirected using the OS API's just like a Group Policy would do. This is reversible.
+
+When a custom folder (appdata, other filesharing tools) is redirected, existing data can be moved, migrated or deleted. Copying is not possible and will automatically default to move because hard or soft links are used and these can only be created as empty folders. Thus existing data
+needs to be moved first. Specify move to move data and create a hard link (leave existing folder), specify migrate to move data and create a soft link (shortcut), select delete to create a hard link and delete all existing data in the folder.
+When redirecting appdata folders or any other folders that are accessed by applications, it is recommend to use move. When migrating from e.g. Box to Onedrive, it is recommended to use migrate.
+
+#>
 #retrieve desired redirections from the registry
 $listOfFoldersToRedirect = @()
 $rootPath = "HKLM:\SOFTWARE\Lieben Consultancy\O4BAM\Redirections"
@@ -34,8 +43,8 @@ foreach($key in Get-ChildItem -Path $rootPath){
         "setEnvironmentVariable" = $regData.setEnvironmentVariable
         "hideSource" = $regData.hideSource
     }
-    if(@("copy","move","delete","none") -notcontains $folder.existingDataAction){
-        Write-Error "Folder redirection from $($regData.source) to $($regData.target) will not be processed because existingDataAction was not specified (copy, move, none or delete)" -ErrorAction Continue
+    if(@("copy","move","delete","migrate","none") -notcontains $folder.existingDataAction){
+        Write-Error "Folder redirection from $($regData.source) to $($regData.target) will not be processed because existingDataAction was not specified (copy, move, migrate, none or delete)" -ErrorAction Continue
         Continue
     }
     if($folder.source.Length -le 2){
@@ -156,6 +165,10 @@ Function Redirect-Folder {
 		    New-Item -Path $target -Type Directory -Force -Verbose
         }
         if($Folder -and (Test-Path $Folder -PathType Container) -and (Test-Path $target -PathType Container)){
+            if($existingDataAction -eq "migrate"){
+                $existingDataAction = "move"
+                Write-Output "unsupported method (migrate) specified for known folder redirection, switching to move mode"
+            }
             try{
                 if($existingDataAction -eq "copy"){
                     Write-Output "Copying original files from source to destination"
@@ -202,28 +215,54 @@ Function Redirect-SpecialFolder {
         [Int]$hideSource,
         [String]$existingDataAction
     )
+    if($existingDataAction -eq "copy"){
+        $existingDataAction = "move"
+        Write-Output "unsupported method (copy) specified for special folder redirection, switching to move mode"
+    }
+
+    $shortcutPath = "$(Split-Path $source -parent)\$(Split-Path $source -leaf).lnk"
 
     #create source location folder if needed
-    if(!(Test-Path $source)){
+    if(!(Test-Path (Split-Path $source -parent))){
         $existingDataAction = "none"
         Write-Output "created folder structure $source"
-        try{New-Item (Split-Path -Path $source -Parent) -ItemType Directory -Force}catch{$Null}
+        try{New-Item (Split-Path -Path $source -Parent) -ItemType Directory -Force | Out-Null}catch{$Null}
     }else{
-        if((Get-Item $source).Target -eq $target){
-            Write-Output "Hard link already pointing to correct location"
-            return $True
+        if($existingDataAction -ne "migrate"){
+            if((Get-Item $source).Target -eq $target){
+                Write-Output "Hard link already pointing to correct location, nothing to do here"
+                return $True
+            }elseif((Get-Item $source).Target -and (Get-Item $source).Target -ne $target){
+                Write-Output "Hard link exists, but is poiting to the wrong target, will update"
+                rmdir $source -force -confirm:$false
+            }else{
+                Write-Output "Hard link does not exist yet"
+            }
+        }else{
+            if((Test-Path $shortcutPath)){
+                $sh = New-Object -ComObject WScript.Shell
+                if($sh.CreateShortcut($shortcutPath).TargetPath -eq $target){
+                    Write-Output "Soft link is already point to correct location, nothing to do here"
+                    return $True
+                }else{
+                    Write-Output "Soft link exists but is pointing to wrong target, will update"
+                    Remove-Item -Path $shortcutPath -Force -Confirm:$False
+                }
+            }else{
+                Write-Output "Soft link does not exist yet"
+            }
         }
     }
 
     #create target location if needed
     if(!(Test-Path $target)){
         Write-Output "created folder $target"
-        New-Item $target -ItemType Directory -Force
+        New-Item $target -ItemType Directory -Force | Out-Null
     }
     
     #Check if the location we're redirecting from exists and if we need to copy anything. To create a hardlink, the source folder must be empty
     if((Test-Path $source)){
-        if($existingDataAction -eq "copy" -or $existingDataAction -eq "move"){
+        if($existingDataAction -eq "move" -or $existingDataAction -eq "migrate"){
             Write-Output "Moving original files from source to destination"
             Try{
                 Get-ChildItem -Path $source -ErrorAction Stop | % {
@@ -238,9 +277,20 @@ Function Redirect-SpecialFolder {
         Remove-Item $source -Recurse -Force -Confirm:$False
     }
 
-    #create a hard link
-    invoke-expression "cmd /c mklink /J `"$source`" `"$target`""
-    Write-Output "hard link created or updated"
+    #create a hard link or soft link
+    if($existingDataAction -eq "migrate"){
+        Set-Variable -Name desktopIniContent -value ([string]"[.ShellClassInfo]`r`nCLSID2={0AFACED1-E828-11D1-9187-B532F1E9575D}`r`nFlags=2")
+        Set-Content -Path "$(Split-Path $source -parent)\desktop.ini" -Value $desktopIniContent -Force
+        $WshShell = New-Object -ComObject WScript.Shell   
+        $Shortcut = $WshShell.CreateShortcut($shortcutPath)
+        $Shortcut.TargetPath = $target         
+        $Shortcut.Description = "Created $(Get-Date -Format s) by O4BAM Lieben Consultancy"
+        $Shortcut.Save()
+        write-output "soft link created or updated"
+    }else{
+        invoke-expression "cmd /c mklink /J `"$source`" `"$target`""
+        Write-Output "hard link created or updated"
+    }
 }
 
 [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Web")

@@ -11,7 +11,8 @@
     author: Jos Lieben / jos@lieben.nu
     copyright: Lieben Consultancy, free to use
     site: https://www.lieben.nu
-    Updated: 27/08/2021
+    Created: 27/08/2021
+    Updated: 18/10/2021
 #>
 #Requires -Modules Az.Accounts
 
@@ -122,7 +123,7 @@ if($groupByProperty){
     $sourceGroupMembers = $sourceGroupMembers | Sort-Object -Descending -Property $groupByProperty
 }
 
-Write-Output "Retrieving members of source group $targetGroupGuid"
+Write-Output "Retrieving members of target group $targetGroupGuid"
 
 $targetGroupMembers = @()
 try{
@@ -158,3 +159,10 @@ for($i=0;$i -lt $sourceGroupMembers.Count;$i++){
         }
     }
 }
+
+if($added -eq 0){
+    Write-Output "All members of source group have already been added to target group"
+}else{
+    Write-Output "Added $added members from source group to target group"
+}
+Write-Output "Job completed"

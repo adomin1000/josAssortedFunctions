@@ -1,4 +1,4 @@
-﻿#leanLAPS GUI, provided AS IS as companion to the leanLAPS script
+#leanLAPS GUI, provided AS IS as companion to the leanLAPS script
 #Kindly provided by Colton Lacy https://www.linkedin.com/in/colton-lacy-826599114/
 
 $remediationScriptID = "73de7252-e2e5-47c5-9af1-cce667ce0587" #To get this go to graph explorer https://developer.microsoft.com/en-us/graph/graph-explorer and use this https://graph.microsoft.com/beta/deviceManagement/deviceHealthScripts to get all remediation scripts and select your scripts id
@@ -6,13 +6,16 @@ $psdAdminUsername = ".\PSDAdmin" #Whatever the Admin username is
 
 Function ConnectMSGraphModule {
 
-    If (!(Get-Module -Name Microsoft.Graph.Intune)) {
+	Try { Import-Module -Name Microsoft.Graph.Intune }
+	Catch { $ErrorMessage = $_.Exception.Message }
+
+    If ($ErrorMessage) {
         [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
-        [Windows.Forms.MessageBox]::Show("Please launch powershell as Administrator and install MSGraph Module with this cmdlet: Install-Module Microsoft.Graph", "PSD", [Windows.Forms.MessageBoxButtons]::OK, [Windows.Forms.MessageBoxIcon]::Information)
+        [Windows.Forms.MessageBox]::Show("Please install the MSGraph Module by running this cmdlet in Powershell as an administrator: Install-Module Microsoft.Graph", "PSD", [Windows.Forms.MessageBoxButtons]::OK, [Windows.Forms.MessageBoxIcon]::Information)
     }
         
     If ((Get-MSGraphEnvironment).SchemaVersion -ne "beta") {
-        Write-CustomEventLog "Changing MSGraph Schema to beta"
+        # Write-CustomEventLog "Changing MSGraph Schema to beta"
         $null = Update-MSGraphEnvironment -SchemaVersion beta
     }
     Connect-MSGraph    
@@ -47,7 +50,7 @@ function getDeviceInfo {
             # Add collected properties to object
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Username" -Value $psdAdminUsername
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value $laps
-            $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password Changed" -Value $lastChanged
+            # $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password Changed" -Value $lastChanged
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device Name" -Value $deviceName
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "User" -Value $userSignedIn
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device OS" -Value $deviceOS

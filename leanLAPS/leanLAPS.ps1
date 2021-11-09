@@ -9,7 +9,7 @@
     filename:               leanLAPS.ps1
     author:                 Jos Lieben (Lieben Consultancy)
     created:                09/06/2021
-    last updated:           23/09/2021
+    last updated:           09/11/2021
     #Copyright/License:     https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
     inspired by:            Rudy Ooms; https://call4cloud.nl/2021/05/the-laps-reloaded/
 #>
@@ -22,8 +22,22 @@ $onlyRunOnWindows10 = $True #buildin protection in case an admin accidentally as
 $markerFile = Join-Path $Env:TEMP -ChildPath "leanLAPS.marker"
 $markerFileExists = (Test-Path $markerFile)
 
-function Get-NewPassword($passwordLength){
-   -join ('abcdefghkmnrstuvwxyzABCDEFGHKLMNPRSTUVWXYZ23456789'.ToCharArray() | Get-Random -Count $passwordLength)
+
+function Get-RandomCharacters($length, $characters) { 
+    $random = 1..$length | ForEach-Object { Get-Random -Maximum $characters.length } 
+    $private:ofs="" 
+    return [String]$characters[$random]
+}
+
+function Get-NewPassword($passwordLength){ #minimum 10 characters will always be returned
+    $password = Get-RandomCharacters -length ([Math]::Max($passwordLength-6,4)) -characters 'abcdefghiklmnoprstuvwxyz'
+    $password += Get-RandomCharacters -length 2 -characters 'ABCDEFGHKLMNOPRSTUVWXYZ'
+    $password += Get-RandomCharacters -length 2 -characters '1234567890'
+    $password += Get-RandomCharacters -length 2 -characters '!_%&/()=?}][{#*+'
+    $characterArray = $password.ToCharArray()   
+    $scrambledStringArray = $characterArray | Get-Random -Count $characterArray.Length     
+    $outputString = -join $scrambledStringArray
+    return $outputString 
 }
 
 Function Write-CustomEventLog($Message){

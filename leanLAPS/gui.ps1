@@ -1,56 +1,54 @@
 #leanLAPS GUI, provided AS IS as companion to the leanLAPS script
-#Kindly provided by Colton Lacy https://www.linkedin.com/in/colton-lacy-826599114/
+#Originally written by Colton Lacy https://www.linkedin.com/in/colton-lacy-826599114/
 
-$remediationScriptID = "73de7252-e2e5-47c5-9af1-cce667ce0587" #To get this go to graph explorer https://developer.microsoft.com/en-us/graph/graph-explorer and use this https://graph.microsoft.com/beta/deviceManagement/deviceHealthScripts to get all remediation scripts and select your scripts id
-$psdAdminUsername = ".\PSDAdmin" #Whatever the Admin username is
+$remediationScriptID = "00000000-0000-0000-0000-000000000000" #To get this ID, go to graph explorer https://developer.microsoft.com/en-us/graph/graph-explorer and use this query https://graph.microsoft.com/beta/deviceManagement/deviceHealthScripts to get all remediation scripts in your tenant and select your script id
+$ErrorActionPreference = "Stop"
 
 Function ConnectMSGraphModule {
 
 	Try { Import-Module -Name Microsoft.Graph.Intune }
-	Catch { $ErrorMessage = $_.Exception.Message }
+	Catch { 
+		write-host Setting up the Microsoft Graph InTune Module...
+		Install-Module -Name Microsoft.Graph.InTune -scope CurrentUser -Force
+		}
+	Finally { $ErrorMessage = $_.Exception.Message }
 
     If ($ErrorMessage) {
         [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")
-        [Windows.Forms.MessageBox]::Show("Please install the MSGraph Module by running this cmdlet in Powershell as an administrator: Install-Module Microsoft.Graph", "PSD", [Windows.Forms.MessageBoxButtons]::OK, [Windows.Forms.MessageBoxIcon]::Information)
+        [Windows.Forms.MessageBox]::Show("There was an issue setting up Microsoft Graph. Please install the MSGraph InTune Module by running this cmdlet in Powershell as an administrator: Install-Module Microsoft.Graph.InTune", "ERROR", [Windows.Forms.MessageBoxButtons]::OK, [Windows.Forms.MessageBoxIcon]::Information)
     }
-        
-    If ((Get-MSGraphEnvironment).SchemaVersion -ne "beta") {
-        # Write-CustomEventLog "Changing MSGraph Schema to beta"
-        $null = Update-MSGraphEnvironment -SchemaVersion beta
-    }
-    Connect-MSGraph    
+
+    Connect-MSGraph
 }
         
 function getDeviceInfo {
         
-    If($inputBox.Text) {
-                        
+    If($inputBox.Text -ne 'Device Name') {
+			
             $outputBox.text =  "Gathering leanLAPS and Device Information for " + $inputBox.text + " - Please wait...."  | Out-String
         
             #Connect to GraphAPI and get leanLAPS for a specific device that was supplied through the GUI
             $graphApiVersion = "beta"
-            $deviceInfo = '?$select=postRemediationDetectionScriptOutput&$filter=managedDevice/deviceName%20eq%20' + "`'" + $inputBox.text + "`'" + '&$expand=managedDevice($select=deviceName,operatingSystem,osVersion,emailAddress)'#Used to get device information that the script ran on 
-            $resource = "deviceManagement/deviceHealthScripts/$remediationScriptID/deviceRunStates$deviceInfo"
-            $urlPostRemediation = "https://graph.microsoft.com/$graphApiVersion/$graphApiVerison/$($Resource)"
-                
-        
+			$deviceInfoURL = [uri]::EscapeUriString("https://graph.microsoft.com/$graphApiVersion/deviceManagement/deviceHealthScripts/$remediationScriptID/deviceRunStates?`$select=postRemediationDetectionScriptOutput&`$filter=managedDevice/deviceName eq '" + $inputBox.text + "'&`$expand=managedDevice(`$select=deviceName,operatingSystem,osVersion,emailAddress)")
+
             #Get information needed from MSGraph call about the Proactive Remediation Device Status
-            $deviceStatus = (Invoke-MSGraphRequest -Url $urlPostRemediation -HttpMethod Get).value
-                
+            $deviceStatus = (Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value
+
+            $LocalAdminUsername = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for " -replace ", last changed on.*"
             $deviceName = $deviceStatus.managedDevice.deviceName
             $userSignedIn = $deviceStatus.managedDevice.emailAddress
             $deviceOS = $deviceStatus.managedDevice.operatingSystem
             $deviceOSVersion = $deviceStatus.managedDevice.osVersion
-            $laps = $deviceStatus.postRemediationDetectionScriptOutput -replace '(?=;).*'
-            $lastChanged = $deviceStatus.postRemediationDetectionScriptOutput -replace '^[^,]*Changed '
+            $laps = $deviceStatus.postRemediationDetectionScriptOutput -replace ".*LeanLAPS current password: " -replace " for $LocalAdminUsername, last changed on.*"
+			$lastChanged = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for $LocalAdminUsername, last changed on "
         
             # Adding properties to object
             $deviceInfoDisplay = New-Object PSCustomObject
         
             # Add collected properties to object
-            $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Username" -Value $psdAdminUsername
+            $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Local Username" -Value (".\" + $LocalAdminUsername)
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value $laps
-            # $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password Changed" -Value $lastChanged
+			$deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password Changed" -Value $lastChanged
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device Name" -Value $deviceName
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "User" -Value $userSignedIn
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device OS" -Value $deviceOS
@@ -63,15 +61,70 @@ function getDeviceInfo {
                 $outputBox.text=$TestResult
             }
         } Else {
-        $TestResult= "Device name has not been provided. Please type a device name and then click Get `"Device`""
+        $TestResult= "Device name has not been provided. Please type a device name and then click `"Device Info`""
         $outputBox.text=$TestResult
     }
 }
-                
-        
+
+function Set-WindowStyle {
+<#
+.SYNOPSIS
+    To control the behavior of a window
+.DESCRIPTION
+    To control the behavior of a window
+.PARAMETER Style
+    Describe parameter -Style.
+.PARAMETER MainWindowHandle
+    Describe parameter -MainWindowHandle.
+.EXAMPLE
+    (Get-Process -Name notepad).MainWindowHandle | foreach { Set-WindowStyle MAXIMIZE $_ }
+#>
+
+    [CmdletBinding(ConfirmImpact='Low')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions','')]
+    param(
+        [ValidateSet('FORCEMINIMIZE', 'HIDE', 'MAXIMIZE', 'MINIMIZE', 'RESTORE',
+                    'SHOW', 'SHOWDEFAULT', 'SHOWMAXIMIZED', 'SHOWMINIMIZED',
+                    'SHOWMINNOACTIVE', 'SHOWNA', 'SHOWNOACTIVATE', 'SHOWNORMAL')]
+        [string] $Style = 'SHOW',
+
+        $MainWindowHandle = (Get-Process -Id $pid).MainWindowHandle
+    )
+
+    begin {
+        Write-Verbose -Message "Starting [$($MyInvocation.Mycommand)]"
+
+        $WindowStates = @{
+            FORCEMINIMIZE   = 11; HIDE            = 0
+            MAXIMIZE        = 3;  MINIMIZE        = 6
+            RESTORE         = 9;  SHOW            = 5
+            SHOWDEFAULT     = 10; SHOWMAXIMIZED   = 3
+            SHOWMINIMIZED   = 2;  SHOWMINNOACTIVE = 7
+            SHOWNA          = 8;  SHOWNOACTIVATE  = 4
+            SHOWNORMAL      = 1
+        }
+    }
+
+    process {
+        Write-Verbose -Message ('Set Window Style {1} on handle {0}' -f $MainWindowHandle, $($WindowStates[$style]))
+
+        $Win32ShowWindowAsync = Add-Type -memberDefinition @'
+[DllImport("user32.dll")]
+public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+'@ -name 'Win32ShowWindowAsync' -namespace Win32Functions -passThru
+
+        $Win32ShowWindowAsync::ShowWindowAsync($MainWindowHandle, $WindowStates[$Style]) | Out-Null
+    }
+
+    end {
+        Write-Verbose -Message "Ending [$($MyInvocation.Mycommand)]"
+    }
+}
+
         ###################### CREATING PS GUI TOOL #############################
          
 ConnectMSGraphModule
+Set-WindowStyle HIDE
         
 #### Form settings #################################################################
 [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") 

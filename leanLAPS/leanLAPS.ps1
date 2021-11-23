@@ -9,7 +9,7 @@
     filename:               leanLAPS.ps1
     author:                 Jos Lieben (Lieben Consultancy)
     created:                09/06/2021
-    last updated:           09/11/2021
+    last updated:           23/11/2021
     #Copyright/License:     https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
     inspired by:            Rudy Ooms; https://call4cloud.nl/2021/05/the-laps-reloaded/
 #>
@@ -18,7 +18,7 @@
 $minimumPasswordLength = 21
 $localAdminName = "LCAdmin"
 $removeOtherLocalAdmins = $False #if set to True, will remove ALL other local admins, including those set through AzureAD device settings
-$onlyRunOnWindows10 = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
+$doNotRunOnServers = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
 $markerFile = Join-Path $Env:TEMP -ChildPath "leanLAPS.marker"
 $markerFileExists = (Test-Path $markerFile)
 $approvedAdmins = @( #specify names for Local AD groups or SID's for Azure groups such as Global Admins and Device Administrators. These are specific to your tenant, you can get them on a device by running: ([ADSI]::new("WinNT://$($env:COMPUTERNAME)/$((New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-544")).Translate([System.Security.Principal.NTAccount]).Value.Split("\")[1]),Group")).Invoke('Members') | % {([ADSI]$_).Path.Split("/")[-1]}
@@ -55,7 +55,7 @@ Function Write-CustomEventLog($Message){
 
 Write-CustomEventLog "LeanLAPS starting on $($ENV:COMPUTERNAME) as $($MyInvocation.MyCommand.Name)"
 
-if($onlyRunOnWindows10 -and [Environment]::OSVersion.Version.Major -ne 10){
+if($doNotRunOnServers -and (Get-WmiObject -Class Win32_OperatingSystem).ProductType -ne 1){
     Write-CustomEventLog "Unsupported OS!"
     Write-Error "Unsupported OS!"
     Exit 0

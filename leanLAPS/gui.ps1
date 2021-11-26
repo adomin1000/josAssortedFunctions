@@ -54,7 +54,7 @@ function getDeviceInfo {
                 $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
                 $rsa.ImportCspBlob([byte[]]($privateKey -split ","))
                 $decrypted = $rsa.Decrypt([byte[]]($laps -split ","), $false)
-                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value [System.Text.Encoding]::UTF8.GetString($decrypted)
+                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value ([System.Text.Encoding]::UTF8.GetString($decrypted))
             }
 			$deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password Changed" -Value $lastChanged
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device Name" -Value $deviceName

@@ -30,7 +30,7 @@ function getDeviceInfo {
         
             #Connect to GraphAPI and get leanLAPS for a specific device that was supplied through the GUI
             $graphApiVersion = "beta"
-			$deviceInfoURL = [uri]::EscapeUriString("https://graph.microsoft.com/$graphApiVersion/deviceManagement/deviceHealthScripts/$remediationScriptID/deviceRunStates?`$select=postRemediationDetectionScriptOutput&`$filter=managedDevice/deviceName eq '" + $inputBox.text + "'&`$expand=managedDevice(`$select=deviceName,operatingSystem,osVersion,emailAddress)")
+			$deviceInfoURL = [uri]::EscapeUriString("https://graph.microsoft.com/$graphApiVersion/deviceManagement/deviceHealthScripts/$remediationScriptID/deviceRunStates?`$select=postRemediationDetectionScriptOutput&`$filter=managedDevice/deviceName eq '" + $inputBox.text + "'&`$expand=managedDevice(`$select=deviceName,operatingSystem,osVersion,emailAddress)&`$top=1")
 
             #Get information needed from MSGraph call about the Proactive Remediation Device Status
             $deviceStatus = (Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value

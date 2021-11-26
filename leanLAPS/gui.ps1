@@ -3,6 +3,7 @@
 
 $remediationScriptID = "00000000-0000-0000-0000-000000000000" #To get this ID, go to graph explorer https://developer.microsoft.com/en-us/graph/graph-explorer and use this query https://graph.microsoft.com/beta/deviceManagement/deviceHealthScripts to get all remediation scripts in your tenant and select your script id
 $ErrorActionPreference = "Stop"
+$privateKey = "" #if you supply a private key, this will be used to decrypt the password (assuming it was encrypting using your public key, as configured in leanLAPS.ps1
 
 Function ConnectMSGraphModule {
 
@@ -47,7 +48,14 @@ function getDeviceInfo {
         
             # Add collected properties to object
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Local Username" -Value (".\" + $LocalAdminUsername)
-            $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value $laps
+            if($privateKey.Length -gt 5){
+                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value $laps
+            }else{
+                $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
+                $rsa.ImportCspBlob([byte[]]($privateKey -split ","))
+                $decrypted = $rsa.Decrypt([byte[]]($laps -split ","), $false)
+                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value [System.Text.Encoding]::UTF8.GetString($decrypted)
+            }
 			$deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password Changed" -Value $lastChanged
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device Name" -Value $deviceName
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "User" -Value $userSignedIn

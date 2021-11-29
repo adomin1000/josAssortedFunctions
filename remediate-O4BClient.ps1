@@ -22,7 +22,7 @@ try{
         Throw "No valid tenant ID returned from $tenantIdKeyPath"
     }
 }catch{
-    Throw $_
+    Write-Host $_
     Exit 1
 }
 
@@ -46,7 +46,7 @@ $waited = 0
     }catch{$Null}
     
     if($waited -gt 600){
-        Throw "Waited for more than 10 minutes, Onedrive hasn't been linked yet. Tell user to sign in to Onedrive"
+        Write-Host "Waited for more than 10 minutes, Onedrive hasn't been linked yet. Tell user to sign in to Onedrive"
         Exit 1
     }
     Start-Sleep -s 10
@@ -102,7 +102,7 @@ function detectIfLogfileStale(){
         [String][Parameter(Mandatory=$true)]$logPath
     )
 
-    if (((get-date).AddHours(-26)) -gt ((get-item $logPath).LastWriteTime)) {
+    if (((get-date).AddHours(-24)) -gt ((get-item $logPath).LastWriteTime)) {
         return $True
     } else {
         return $False
@@ -152,14 +152,10 @@ function startO4B(){
     #onedrive needs to run in unelevated context, so de-elevate if necessary
     If (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")){  
         $createTask = "schtasks /Create /SC ONCE /TN remediateO4BClient /IT /RL LIMITED /F /TR `"$exePath`" /ST 23:59"    
-        $res = Invoke-Expression $createTask | OUt-Null
-        if($res -NotMatch "ERROR"){
-            $res = Invoke-Expression "schtasks /Run /TN remediateO4BClient /I" | Out-Null
-            Start-Sleep -s 2
-            $res = Invoke-Expression "schtasks /delete /TN remediateO4BClient /F" | Out-Null
-        }else{
-            Throw $_
-        }
+        $res = Invoke-Expression $createTask | Out-Null
+        $res = Invoke-Expression "schtasks /Run /TN remediateO4BClient /I" | Out-Null
+        Start-Sleep -s 2
+        $res = Invoke-Expression "schtasks /delete /TN remediateO4BClient /F" | Out-Null
     }else{
         Start-Process $exePath
     }

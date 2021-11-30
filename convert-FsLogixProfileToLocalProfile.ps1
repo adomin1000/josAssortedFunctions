@@ -157,10 +157,11 @@ try{
 }
 
 Write-Output "Setting permissions on $profileTargetPath folder"
+takeown /f $profileTargetPath | Out-Null
 icacls $profileTargetPath /inheritance:r | Out-Null
+icacls $profileTargetPath /grant Administrators:`(OI`)`(CI`)FF /t /c /q | Out-Null
 icacls $profileTargetPath /grant $domainNetbiosName\$($user):`(OI`)`(CI`)F /t /c /q | Out-Null
 icacls $profileTargetPath /grant SYSTEM:`(OI`)`(CI`)FF /t /c /q | Out-Null
-icacls $profileTargetPath /grant Administrators:`(OI`)`(CI`)FF /t /c /q | Out-Null
 
 Write-Output "Cleaning up"
 Remove-Item -Path (Join-Path $profileTargetPath -ChildPath "AppData\Local\FSLogix") -Force -Confirm:$False -ErrorAction SilentlyContinue -Recurse

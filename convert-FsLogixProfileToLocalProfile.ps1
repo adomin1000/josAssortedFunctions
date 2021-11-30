@@ -35,7 +35,7 @@ try{
     }else{
         $profileRemotePath = (Get-ChildItem $filesharePath | where{$_.Name.EndsWith($user)}).FullName
     }
-    $profileRemotePath = (Get-ChildItem $profileRemotePath | where{$_.Name.StartsWith("Profile")}).FullName
+    $profileRemotePath = (Get-ChildItem $profileRemotePath | where{$_.Name.StartsWith("Profile") -and $_.Name.EndsWith(".vhd")}).FullName
     if(!(Test-Path $profileRemotePath)){
         Throw "Failed to find a profile directory for $user in $filesharePath"
     }
@@ -50,14 +50,22 @@ if($profileRemotePath.Count -gt 1){
     Exit 1
 }
 
+if($createBackupOfProfile){
+    Copy-Item $profileRemotePath $profileRemotePath.Replace(".vhd",".bck")
+}
+
 try{
     Write-Output "Mounting profile disk of $user"
-    $profileMountResult = Mount-DiskImage -ImagePath $profileRemotePath -StorageType VHD -Access ReadWrite
+    $profileMountResult = Mount-DiskImage -ImagePath $profileRemotePath -StorageType VHD -Access ReadOnly
+    Start-Sleep -Seconds 20
     $vol = Get-CimInstance -ClassName Win32_Volume | Where{$_.Label -and $_.Label.StartsWith("Profile")}
-    if(!$vol.DriveLetter -eq "G:"){
+    if(!$vol.DriveLetter){
         $vol | Set-CimInstance -Property @{DriveLetter = "G:"}
+        $driveLetter = "G:"
+    }else{
+        $driveLetter = $vol.DriveLetter
     }
-    $profileSourcePath = Join-Path "G:" -ChildPath "Profile"
+    $profileSourcePath = Join-Path $driveLetter -ChildPath "Profile"
     if(!(Test-Path $profileSourcePath)){
         Throw "Could not access $profileSourcePath after mounting the profile disk"
     }
@@ -67,25 +75,9 @@ try{
 }
 
 try{
-    Write-Output "Setting ACL's on profile before copying content..."
-    takeown /f $profileSourcePath | Out-Null
-    icacls $profileSourcePath /grant SYSTEM:`(OI`)`(CI`)F /c /q | Out-Null
-}catch{
-    Write-Output $_
-    Exit 1
-}
-
-try{
-    Write-Output "ACL's configured. Checking for FSLogix regfile to import"
-    $profileRegDataFilePath = (Join-Path $profileSourcePath -ChildPath "AppData\Local\FSLogix\ProfileData.reg")
-    $profileRegData = Get-Content -Path $profileRegDataFilePath
-    $profileTargetPath = $profileRegData | % {if($_.StartsWith("`"ProfileImagePath")){$_.SubString(19).Replace('"','').Replace('\\','\')}}
-    if(!(Test-Path $profileTargetPath)){
-        Throw "Could not parse target path from regfile, or regfile does not exist!"
-    }
-    Write-Output "Determined profile target path: $profileTargetPath"
-}catch{
+    Write-Output "Preparing regkeys"
     $profileTargetPath = Join-Path "c:\users\" -ChildPath $user
+    $profileRegDataFilePath = Join-Path $Env:TEMP -ChildPath "profile.reg"
     if($FlipFlopProfileDirectoryName){
         $SID = $profileRemotePath.Split('\')[-2].Split("_")[1]
     }else{
@@ -111,24 +103,18 @@ try{
 `"RunLogonScriptSync`"=dword:00000000
 `"LocalProfileUnloadTimeLow`"=dword:2c3ee568
 `"LocalProfileUnloadTimeHigh`"=dword:01d7e5c2" | Out-File $profileRegDataFilePath
-    Write-Output "Using automatic fallback profile target path: $profileTargetPath"
+    Write-Output "Determined profile target path: $profileTargetPath"
+}catch{
+    Write-Output "Failed to compose regkeys"
+    Write-Output $_
+    Exit 1
 }
 
 try{
     Write-Output "Copying profile from $profileSourcePath to $profileTargetPath"
+    Remove-Item $profileTargetPath -Force -Confirm:$False -ErrorAction SilentlyContinue -Recurse
     robocopy $profileSourcePath $profileTargetPath /MIR /XJ *>&1 | Out-Null
     Write-Output "Copied profile from $profileSourcePath to $profileTargetPath"
-}catch{
-    Write-Output $_
-}
-
-try{
-    if($profileRegDataFilePath -and (Test-Path $profileRegDataFilePath)){
-        Write-Output "Writing registry data"
-        Invoke-Command {reg import $profileRegDataFilePath *>&1 | Out-Null}
-    }else{
-        Write-Output "Skipping regfile import due to earlier issues parsing the user's regfile"
-    }
 }catch{
     Write-Output $_
 }
@@ -137,6 +123,13 @@ try{
     Write-Output "Dismounting remote profile disk"
     Dismount-DiskImage -ImagePath $profileRemotePath -StorageType VHD -Confirm:$False
     Write-Output "Dismounted $profileRemotePath"
+}catch{
+    Write-Output $_
+}
+
+try{
+    Invoke-Command {reg import $profileRegDataFilePath *>&1 | Out-Null}
+    Remove-Item $profileRegDataFilePath -Force -Confirm:$False -Recurse -ErrorAction SilentlyContinue
 }catch{
     Write-Output $_
 }
@@ -157,11 +150,11 @@ try{
 }
 
 Write-Output "Setting permissions on $profileTargetPath folder"
-takeown /f $profileTargetPath | Out-Null
+takeown /r /f $profileTargetPath /d Y /a | Out-Null
 icacls $profileTargetPath /inheritance:r | Out-Null
-icacls $profileTargetPath /grant Administrators:`(OI`)`(CI`)FF /t /c /q | Out-Null
-icacls $profileTargetPath /grant $domainNetbiosName\$($user):`(OI`)`(CI`)F /t /c /q | Out-Null
-icacls $profileTargetPath /grant SYSTEM:`(OI`)`(CI`)FF /t /c /q | Out-Null
+icacls $profileTargetPath /grant Administrators:`(OI`)`(CI`)F /t /c /q | Out-Null
+icacls $profileTargetPath /grant $($domainNetbiosName)\$($user):`(OI`)`(CI`)F /t /c /q | Out-Null
+icacls $profileTargetPath /grant SYSTEM:`(OI`)`(CI`)F /t /c /q | Out-Null
 
 Write-Output "Cleaning up"
 Remove-Item -Path (Join-Path $profileTargetPath -ChildPath "AppData\Local\FSLogix") -Force -Confirm:$False -ErrorAction SilentlyContinue -Recurse
@@ -171,6 +164,17 @@ get-childitem -path "c:\users" | %{
         Write-Output "Removed $($_.FullName)"
     }
 }
+
+& REG LOAD HKLM\temp "C:\Users\$user\NTUSER.DAT"
+$baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey("LocalMachine",[Microsoft.Win32.RegistryView]::Registry64)
+$key = $baseKey.OpenSubKey('temp\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\', $true)
+$key.SetValue('Cache', "%SystemDrive%\Users\$($user)\INetCache", 'ExpandString')
+$key = $baseKey.OpenSubKey('temp\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders\', $true)
+$key.SetValue('Cache', "C:\Users\$($user)\INetCache", 'ExpandString')
+$key = $baseKey.OpenSubKey('temp\Environment\', $true)
+$key.SetValue('TEMP', "C:\Users\$($user)\Temp", 'ExpandString')
+$key.SetValue('TMP', "C:\Users\$($user)\Temp", 'ExpandString')
+$baseKey.Close()
 
 Write-Output "Script completed, VM is rebooting and will be ready for logon soon"
 Restart-Computer -Force -Confirm:$False

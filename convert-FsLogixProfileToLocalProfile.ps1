@@ -9,7 +9,7 @@
 #How to use:        Run as admin on the user's VM, or run using Run Command (make sure the user's computer account has sufficient permissions on the share in this case)
 
 $user = "samaccountname of user" #e.g. jflieben
-$FlipFlopProfileDirectoryName = $True
+$FlipFlopProfileDirectoryName = $True #set to $True if the share has SAMACCOUNT_SID format, otherwise set to $False. See https://docs.microsoft.com/en-us/fslogix/profile-container-configuration-reference#flipflopprofiledirectoryname
 $filesharePath = "\\accountname.file.core.windows.net\user-profiles"
 $userName = "AZURE\accountname" #use AZURE\StorageAccountName when mapping an Azure File Share. Use UPN for other share types
 $password = "StorageAccountKey" #https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?tabs=azure-portal#view-account-access-keys
@@ -93,24 +93,24 @@ try{
     }
     ([string]$SID).ToCharArray() | % { $sidToHex += ("{0:x} " -f [int]$_) } 
 	
-    "Windows Registry Editor Version 5.00
+"Windows Registry Editor Version 5.00
 
-    [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$SID]
-    `"ProfileImagePath`"=`"$($profileTargetPath.Replace('\','\\'))`"
-    `"Guid`"=`"{$([guid]::New(([adsisearcher]"SamAccountName=$user").FindOne().Properties.objectguid[0]).Guid)}`"
-    `"Flags`"=dword:00000000
-    `"FullProfile`"=dword:00000001
-    `"Sid`"=hex:$($sidToHex.replace(" ",",").TrimEnd(','))
-    `"State`"=dword:00000000
-    `"LocalProfileLoadTimeLow`"=dword:409f513d
-    `"LocalProfileLoadTimeHigh`"=dword:01d7e5b8
-    `"ProfileAttemptedProfileDownloadTimeLow`"=dword:00000000
-    `"ProfileAttemptedProfileDownloadTimeHigh`"=dword:00000000
-    `"ProfileLoadTimeLow`"=dword:00000000
-    `"ProfileLoadTimeHigh`"=dword:00000000
-    `"RunLogonScriptSync`"=dword:00000000
-    `"LocalProfileUnloadTimeLow`"=dword:2c3ee568
-    `"LocalProfileUnloadTimeHigh`"=dword:01d7e5c2" | Out-File $profileRegDataFilePath
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$SID]
+`"ProfileImagePath`"=`"$($profileTargetPath.Replace('\','\\'))`"
+`"Guid`"=`"{$([guid]::New(([adsisearcher]"SamAccountName=$user").FindOne().Properties.objectguid[0]).Guid)}`"
+`"Flags`"=dword:00000000
+`"FullProfile`"=dword:00000001
+`"Sid`"=hex:$($sidToHex.replace(" ",",").TrimEnd(','))
+`"State`"=dword:00000000
+`"LocalProfileLoadTimeLow`"=dword:409f513d
+`"LocalProfileLoadTimeHigh`"=dword:01d7e5b8
+`"ProfileAttemptedProfileDownloadTimeLow`"=dword:00000000
+`"ProfileAttemptedProfileDownloadTimeHigh`"=dword:00000000
+`"ProfileLoadTimeLow`"=dword:00000000
+`"ProfileLoadTimeHigh`"=dword:00000000
+`"RunLogonScriptSync`"=dword:00000000
+`"LocalProfileUnloadTimeLow`"=dword:2c3ee568
+`"LocalProfileUnloadTimeHigh`"=dword:01d7e5c2" | Out-File $profileRegDataFilePath
     Write-Output "Using automatic fallback profile target path: $profileTargetPath"
 }
 
@@ -171,4 +171,5 @@ get-childitem -path "c:\users" | %{
     }
 }
 
-Write-Output "Script completed, VM is ready for user logon"
+Write-Output "Script completed, VM is rebooting and will be ready for logon soon"
+Restart-Computer -Force -Confirm:$False

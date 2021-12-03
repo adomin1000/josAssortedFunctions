@@ -14,6 +14,7 @@ $filesharePath = "\\accountname.file.core.windows.net\user-profiles"
 $userName = "AZURE\accountname" #use AZURE\StorageAccountName when mapping an Azure File Share. Use UPN for other share types
 $password = "StorageAccountKey" #https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?tabs=azure-portal#view-account-access-keys
 $domainNetbiosName = "EMEA"
+$createBackupOfProfile = $True
 
 try{
     Write-Output "Mounting profile share"
@@ -56,7 +57,7 @@ if($createBackupOfProfile){
 
 try{
     Write-Output "Mounting profile disk of $user"
-    $profileMountResult = Mount-DiskImage -ImagePath $profileRemotePath -StorageType VHD -Access ReadOnly
+    $profileMountResult = Mount-DiskImage -ImagePath $profileRemotePath -StorageType VHD -Access ReadWrite
     Start-Sleep -Seconds 20
     $vol = Get-CimInstance -ClassName Win32_Volume | Where{$_.Label -and $_.Label.StartsWith("Profile")}
     if(!$vol.DriveLetter){

@@ -48,7 +48,7 @@ function getDeviceInfo {
         
             # Add collected properties to object
             $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Local Username" -Value (".\" + $LocalAdminUsername)
-            if($privateKey.Length -gt 5){
+            if($privateKey.Length -lt 5){
                 $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value $laps
             }else{
                 $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider

@@ -58,7 +58,7 @@ function detectOdmLogFile(){
     if((Test-Path $odmDiagLogPath)){
         return $odmDiagLogPath
     }else{
-        return $False
+        return -1
     }    
 }
 
@@ -66,7 +66,7 @@ function detectOdmRunning(){
     try{
         $o4bProcessInfo = @(Get-ProcessWithOwner -ProcessName "onedrive")[0]
         if($o4bProcessInfo.ProcessName){
-            return $true
+            return $True
         }else{
             Throw
         }
@@ -82,6 +82,9 @@ function parseOdmLogFileForStatus(){
     )
     
     try{
+        if(!(Test-Path $logPath)){
+            Throw "logfile does not exist at $logPath"
+        }
         $progressState = Get-Content $logPath | Where-Object { $_.Contains("SyncProgressState") } | %{ -split $_ | select -index 1 }    
         switch($progressState){
             0{ return "Healthy"}
@@ -175,81 +178,90 @@ function restartO4B(){
 
 #code that runs when MEM runs this script in Detection Mode
 if($mode -eq "detect"){
-    #give everything a chance to start up
-    Start-Sleep -s 300
+    try{
+        #give everything a chance to start up
+        Start-Sleep -s 300
 
-    #no logfile while in detection mode, we'll have to remediate
-    if($False -eq (detectOdmLogFile)){
-        Write-Host "No Onedrive logfile present"
-        Exit 1
-    }
+        #no logfile while in detection mode, we'll have to remediate
+        if((detectOdmLogFile) -eq -1){
+            Write-Host "No Onedrive logfile present"
+            Exit 1
+        }
 
-    #onedrive not running, we'll have to remediate
-    if($False -eq (detectOdmRunning)){
-        Write-Host "Onedrive not running"
-        Exit 1
-    }
+        #onedrive not running, we'll have to remediate
+        if($False -eq (detectOdmRunning)){
+            Write-Host "Onedrive not running"
+            Exit 1
+        }
 
-    #logfile is old, we'll have to remediate
-    if((detectIfLogfileStale -logPath (detectOdmLogFile))){
-        Write-Host "Onedrive logfile is old and not updating"
-        Exit 1
-    }
+        #logfile is old, we'll have to remediate
+        if((detectIfLogfileStale -logPath (detectOdmLogFile))){
+            Write-Host "Onedrive logfile is old and not updating"
+            Exit 1
+        }
 
-    #check onedrive state and decide if we need to remediate
-    $onedriveStatus = (parseOdmLogFileForStatus -logPath (detectOdmLogFile))
+        #check onedrive state and decide if we need to remediate
+        $onedriveStatus = (parseOdmLogFileForStatus -logPath (detectOdmLogFile))
 
-    if($onedriveStatus -eq "Unhealthy" -or $onedriveStatus.StartsWith("Unknown:")){
-        Write-Host "Onedrive not in a healthy state: $onedriveStatus"
-        Exit 1
-    }else{
-        Write-Host "Onedrive state: $onedriveStatus"
-        Exit 0
+        if($onedriveStatus -eq "Unhealthy" -or $onedriveStatus.StartsWith("Unknown:")){
+            Write-Host "Onedrive not in a healthy state: $onedriveStatus"
+            Exit 1
+        }else{
+            Write-Host "Onedrive state: $onedriveStatus"
+            Exit 0
+        }
+    }catch{
+        Write-Host "I don't know how to handle this error: $($_)"
+        Exit 1  
     }
 }
 
 #code that runs when MEM runs this script in Remediation Mode
 if($mode -ne "detect"){
-
-    if($False -ne (detectOdmLogFile)){
-        if((detectIfLogfileStale -logPath (detectOdmLogFile))){
-            #remove stale logfile so it can be refreshed
-            Remove-Item -Path (detectOdmLogFile) -Force -Confirm:$False
+    try{
+        if((detectOdmLogFile) -ne -1){
+            if((detectIfLogfileStale -logPath (detectOdmLogFile))){
+                #remove stale logfile so it can be refreshed
+                Remove-Item -Path (detectOdmLogFile) -Force -Confirm:$False
+            }
         }
-    }
 
-    if($False -eq (detectOdmRunning)){
-        #ODM is not running, start it and check again
-        startO4B
-        Start-Sleep -s 300
         if($False -eq (detectOdmRunning)){
-            Write-Host "Could not start Onedrive client! No onedrive.exe process discovered"
-            Exit 1
+            #ODM is not running, start it and check again
+            startO4B
+            Start-Sleep -s 300
+            if($False -eq (detectOdmRunning)){
+                Write-Host "Could not start Onedrive client! No onedrive.exe process discovered"
+                Exit 1
+            }
         }
-    }
 
-    #no logfile while in remediation mode, we'll have to wait a few minutes
-    if($False -eq (detectOdmLogFile)){
-        Start-Sleep -s 300
-    }
-
-    #if still no logfile, we'll have to restart the Onedrive client
-    if($False -eq (detectOdmLogFile)){
-        restartO4B
-        Start-Sleep -s 300
-        if($False -eq (detectOdmLogFile)){
-            Write-Host "No logfile after restarting Onedrive, something may be wrong with the Onedrive client that cannot be auto-remediated"
-            Exit 1
+        #no logfile while in remediation mode, we'll have to wait a few minutes
+        if((detectOdmLogFile) -eq -1){
+            Start-Sleep -s 600
         }
-    }
 
-    #logfile status should be good now, if not, cannot do much more
-    $onedriveStatus = (parseOdmLogFileForStatus -logPath (detectOdmLogFile))
-    if(($onedriveStatus -eq "Unhealthy" -or $onedriveStatus.StartsWith("Unknown:"))){
-        Write-Host "After restarting Onedrive, still not in a healthy state: $onedriveStatus"
-        Exit 1
-    }else{
-        Write-Host "Onedrive state: $onedriveStatus"
-        Exit 0
+        #if still no logfile, we'll have to restart the Onedrive client
+        if((detectOdmLogFile) -eq -1){
+            restartO4B
+            Start-Sleep -s 600
+            if((detectOdmLogFile) -eq -1){
+                Write-Host "No logfile after restarting Onedrive, something may be wrong with the Onedrive client that cannot be auto-remediated"
+                Exit 1
+            }
+        }
+
+        #logfile status should be good now, if not, cannot do much more
+        $onedriveStatus = (parseOdmLogFileForStatus -logPath (detectOdmLogFile))
+        if(($onedriveStatus -eq "Unhealthy" -or $onedriveStatus.StartsWith("Unknown:"))){
+            Write-Host "After restarting Onedrive, still not in a healthy state: $onedriveStatus"
+            Exit 1
+        }else{
+            Write-Host "Onedrive remediated to: $onedriveStatus"
+            Exit 0
+        }
+    }catch{
+        Write-Host "I don't know how to handle this error: $($_)"
+        Exit 1  
     }
 }

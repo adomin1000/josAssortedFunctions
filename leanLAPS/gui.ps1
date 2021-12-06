@@ -33,7 +33,7 @@ function getDeviceInfo {
 			$deviceInfoURL = [uri]::EscapeUriString("https://graph.microsoft.com/$graphApiVersion/deviceManagement/deviceHealthScripts/$remediationScriptID/deviceRunStates?`$select=postRemediationDetectionScriptOutput&`$filter=managedDevice/deviceName eq '" + $inputBox.text + "'&`$expand=managedDevice(`$select=deviceName,operatingSystem,osVersion,emailAddress)&`$top=1")
 
             #Get information needed from MSGraph call about the Proactive Remediation Device Status
-            $deviceStatus = (Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value
+            $deviceStatus = @((Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value)[0]
 
             $LocalAdminUsername = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for " -replace ", last changed on.*"
             $deviceName = $deviceStatus.managedDevice.deviceName
@@ -53,7 +53,7 @@ function getDeviceInfo {
             }else{
                 $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
                 $rsa.ImportCspBlob([byte[]]($privateKey -split ","))
-                $decrypted = $rsa.Decrypt([byte[]]($laps -split ","), $false)
+                $decrypted = $rsa.Decrypt([byte[]]($laps -split " "), $false)
                 $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value ([System.Text.Encoding]::UTF8.GetString($decrypted))
             }
 			$deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password Changed" -Value $lastChanged
@@ -65,12 +65,10 @@ function getDeviceInfo {
             If($deviceInfoDisplay.Password) {
                 $outputBox.text = ($deviceInfoDisplay | Out-String).Trim()
             } Else {
-                $TestResult= "Failed to gather information. Please check the device name."
-                $outputBox.text=$TestResult
+                $outputBox.text="Failed to gather information. Please check the device name."
             }
         } Else {
-        $TestResult= "Device name has not been provided. Please type a device name and then click `"Device Info`""
-        $outputBox.text=$TestResult
+            $outputBox.text="Device name has not been provided. Please type a device name and then click `"Device Info`""
     }
 }
 

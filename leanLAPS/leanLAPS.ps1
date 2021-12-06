@@ -9,7 +9,7 @@
     filename:               leanLAPS.ps1
     author:                 Jos Lieben (Lieben Consultancy)
     created:                09/06/2021
-    last updated:           23/11/2021
+    last updated:           see Git
     #Copyright/License:     https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
     inspired by:            Rudy Ooms; https://call4cloud.nl/2021/05/the-laps-reloaded/
 #>
@@ -75,7 +75,7 @@ if($mode -ne "detect"){
         Remove-Item -Path $markerFile -Force -Confirm:$False
         if($publicEncryptionKey.Length -gt 5){
             $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
-            $rsa.ImportCspBlob([byte[]]($publicKey -split ","))
+            $rsa.ImportCspBlob([byte[]]($publicEncryptionKey -split ","))
             $pwd = $rsa.Encrypt([System.Text.Encoding]::UTF8.GetBytes($pwd), $false )
         }else{
             #ensure the plaintext password is removed from Intune log files and registry (which are written after a delay):

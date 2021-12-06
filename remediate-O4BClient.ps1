@@ -46,7 +46,7 @@ $waited = 0
     }catch{$Null}
     
     if($waited -gt 600){
-        Write-Host "Waited for more than 10 minutes, Onedrive hasn't been linked yet. Tell user to sign in to Onedrive"
+        Write-Host "Unlinked to tenant"
         Exit 1
     }
     Start-Sleep -s 10
@@ -184,7 +184,7 @@ if($mode -eq "detect"){
 
         #no logfile while in detection mode, we'll have to remediate
         if((detectOdmLogFile) -eq -1){
-            Write-Host "No Onedrive logfile present"
+            Write-Host "No logfile present"
             Exit 1
         }
 
@@ -196,7 +196,7 @@ if($mode -eq "detect"){
 
         #logfile is old, we'll have to remediate
         if((detectIfLogfileStale -logPath (detectOdmLogFile))){
-            Write-Host "Onedrive logfile is old and not updating"
+            Write-Host "Logfile is old and not updating"
             Exit 1
         }
 
@@ -204,10 +204,10 @@ if($mode -eq "detect"){
         $onedriveStatus = (parseOdmLogFileForStatus -logPath (detectOdmLogFile))
 
         if($onedriveStatus -eq "Unhealthy" -or $onedriveStatus.StartsWith("Unknown:")){
-            Write-Host "Onedrive not in a healthy state: $onedriveStatus"
+            Write-Host "$onedriveStatus"
             Exit 1
         }else{
-            Write-Host "Onedrive state: $onedriveStatus"
+            Write-Host "$onedriveStatus"
             Exit 0
         }
     }catch{
@@ -231,7 +231,7 @@ if($mode -ne "detect"){
             startO4B
             Start-Sleep -s 300
             if($False -eq (detectOdmRunning)){
-                Write-Host "Could not start Onedrive client! No onedrive.exe process discovered"
+                Write-Host "Could not start Onedrive client"
                 Exit 1
             }
         }
@@ -254,10 +254,10 @@ if($mode -ne "detect"){
         #logfile status should be good now, if not, cannot do much more
         $onedriveStatus = (parseOdmLogFileForStatus -logPath (detectOdmLogFile))
         if(($onedriveStatus -eq "Unhealthy" -or $onedriveStatus.StartsWith("Unknown:"))){
-            Write-Host "After restarting Onedrive, still not in a healthy state: $onedriveStatus"
+            Write-Host "$onedriveStatus"
             Exit 1
         }else{
-            Write-Host "Onedrive remediated to: $onedriveStatus"
+            Write-Host "Remediated to: $onedriveStatus"
             Exit 0
         }
     }catch{

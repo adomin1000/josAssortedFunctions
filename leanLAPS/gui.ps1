@@ -30,10 +30,20 @@ function getDeviceInfo {
         
             #Connect to GraphAPI and get leanLAPS for a specific device that was supplied through the GUI
             $graphApiVersion = "beta"
-			$deviceInfoURL = [uri]::EscapeUriString("https://graph.microsoft.com/$graphApiVersion/deviceManagement/deviceHealthScripts/$remediationScriptID/deviceRunStates?`$select=postRemediationDetectionScriptOutput&`$filter=managedDevice/deviceName eq '" + $inputBox.text + "'&`$expand=managedDevice(`$select=deviceName,operatingSystem,osVersion,emailAddress)&`$top=1")
+			$deviceInfoURL = [uri]::EscapeUriString("https://graph.microsoft.com/$graphApiVersion/deviceManagement/deviceHealthScripts/$remediationScriptID/deviceRunStates?`$select=postRemediationDetectionScriptOutput&`$filter=managedDevice/deviceName eq '" + $inputBox.text + "'&`$expand=managedDevice(`$select=deviceName,operatingSystem,osVersion,emailAddress)")
 
             #Get information needed from MSGraph call about the Proactive Remediation Device Status
-            $deviceStatus = @((Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value)[0]
+            $device = $Null
+            $deviceStatuses = (Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value
+            foreach($device in $deviceStatuses){
+                if($deviceStatus){
+                    if([DateTime]($device.postRemediationDetectionScriptOutput -Replace(".* changed on ","")) -gt [DateTime]($deviceStatus.postRemediationDetectionScriptOutput -Replace(".* changed on ",""))){
+                        $deviceStatus = $device
+                    }
+                }else{
+                    $deviceStatus = $device
+                }
+            }
 
             $LocalAdminUsername = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for " -replace ", last changed on.*"
             $deviceName = $deviceStatus.managedDevice.deviceName

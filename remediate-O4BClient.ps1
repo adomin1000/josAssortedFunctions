@@ -8,7 +8,7 @@
 #Requirements:      Windows 10 build 1803, Onedrive preinstalled / configured (see my blog for instructions on fully automating that)
 
 if($Env:USERPROFILE.EndsWith("system32\config\systemprofile")){
-    Throw "Running as SYSTEM, this script should run in user context!"
+    Write-Host "Running as SYSTEM, this script should run in user context!"
     Exit 1
 }
 
@@ -82,22 +82,28 @@ function parseOdmLogFileForStatus(){
     )
     
     try{
+        $retVal = "Unknown: log file could not be parsed"
         if(!(Test-Path $logPath)){
             Throw "logfile does not exist at $logPath"
         }
-        $progressState = Get-Content $logPath | Where-Object { $_.Contains("SyncProgressState") } | %{ -split $_ | select -index 1 }    
+        $progressState = Get-Content $logPath | Where-Object { $_.Contains("SyncProgressState") } | %{ -split $_ | select -index 1 }
+        if(!$progressState){
+            Throw "SyncProgressState string not found"
+        } 
         switch($progressState){
-            0{ return "Healthy"}
-            42{ return "Healthy"}
-            16777216{ return "Healthy"}
-		    65536{ return "Paused"}
-		    8194{ return "Disabled"}
-		    1854{ return "Unhealthy"}
-		    default { return "Unknown: $progressState"}
+            0{ $retVal = "Healthy"}
+            42{ $retVal = "Healthy"}
+            16777216{ $retVal = "Healthy"}
+		    65536{ $retVal = "Paused"}
+		    8194{ $retVal = "Disabled"}
+		    1854{ $retVal = "Unhealthy"}
+		    default { $retVal = "Unknown: $progressState"}
 	    }
     }catch{
-        return "Unknown: Could not find sync state in O4B log $_"
-    }   
+        $retVal = "Unknown: Could not find sync state in O4B log $_"
+    }
+
+    return $retVal
 }
 
 function detectIfLogfileStale(){
@@ -211,7 +217,7 @@ if($mode -eq "detect"){
             Exit 0
         }
     }catch{
-        Write-Host "I don't know how to handle this error: $($_)"
+        Write-Host "I don't know how to handle this error: $($_) logfile: $(detectOdmLogFile)"
         Exit 1  
     }
 }
@@ -261,7 +267,7 @@ if($mode -ne "detect"){
             Exit 0
         }
     }catch{
-        Write-Host "I don't know how to handle this error: $($_)"
+        Write-Host "I don't know how to handle this error: $($_) logfile: $(detectOdmLogFile)"
         Exit 1  
     }
 }

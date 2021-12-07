@@ -15,6 +15,7 @@ $userName = "AZURE\accountname" #use AZURE\StorageAccountName when mapping an Az
 $password = "StorageAccountKey" #https://docs.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage?tabs=azure-portal#view-account-access-keys
 $domainNetbiosName = "EMEA"
 $createBackupOfProfile = $True
+$resetOnedrive = $False
 
 try{
     Write-Output "Mounting profile share"
@@ -166,6 +167,14 @@ get-childitem -path "c:\users" | %{
     }
 }
 
+Remove-Item "C:\Users\$user\AppData\Local\OneDrive\cache" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+if($resetOnedrive ) {
+    Remove-Item "C:\Users\$user\AppData\Local\Microsoft\OneDrive" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+}
+Remove-Item "C:\Users\$user\AppData\Local\Microsoft\Office\16.0\Wef" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+Remove-Item "C:\Users\$user\AppData\Local\Packages\Microsoft.Win32WebViewHost_cw5n1h2txyewy\AC\#!123\INetCache" -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
+
+
 & REG LOAD HKLM\temp "C:\Users\$user\NTUSER.DAT"
 $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey("LocalMachine",[Microsoft.Win32.RegistryView]::Registry64)
 $key = $baseKey.OpenSubKey('temp\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders\', $true)
@@ -175,6 +184,9 @@ $key.SetValue('Cache', "C:\Users\$($user)\INetCache", 'ExpandString')
 $key = $baseKey.OpenSubKey('temp\Environment\', $true)
 $key.SetValue('TEMP', "C:\Users\$($user)\Temp", 'ExpandString')
 $key.SetValue('TMP', "C:\Users\$($user)\Temp", 'ExpandString')
+if($resetOnedrive){
+    $baseKey.DeleteSubKeyTree('temp\SOFTWARE\Microsoft\OneDrive\Accounts\Business1', $true)
+}
 $baseKey.Close()
 
 Write-Output "Script completed, VM is rebooting and will be ready for logon soon"

@@ -84,7 +84,6 @@ function New-RetryCommand {
 
 [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Web")
 $res = [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
-
 try{
     Write-Output "Logging in with MI"
     $Null = Connect-AzAccount -Identity

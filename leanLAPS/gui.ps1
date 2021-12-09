@@ -34,6 +34,7 @@ function getDeviceInfo {
 
             #Get information needed from MSGraph call about the Proactive Remediation Device Status
             $device = $Null
+            $deviceStatus = $Null
             $deviceStatuses = (Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value
             foreach($device in $deviceStatuses){
                 if($deviceStatus){

@@ -94,8 +94,10 @@ function parseOdmLogFileForStatus(){
             0{ $retVal = "Healthy"}
             42{ $retVal = "Healthy"}
             16777216{ $retVal = "Healthy"}
+            12544 { $retVal = "Healthy"}
 		    65536{ $retVal = "Paused"}
             32786{ $retVal = "File merge conflict"}
+            8449{ $retVal = "File locked"}
 		    8194{ $retVal = "Disabled"}                        
 		    1854{ $retVal = "Unhealthy"}
 		    default { $retVal = "Unknown: $progressState"}
@@ -227,35 +229,20 @@ if($mode -eq "detect"){
 if($mode -ne "detect"){
     try{
         if((detectOdmLogFile) -ne -1){
-            if((detectIfLogfileStale -logPath (detectOdmLogFile))){
-                #remove stale logfile so it can be refreshed
-                Remove-Item -Path (detectOdmLogFile) -Force -Confirm:$False
-            }
+            Remove-Item -Path (detectOdmLogFile) -Force -Confirm:$False
+        }
+
+        #(re) start O4B
+        restartO4B
+        Start-Sleep -s 900
+        if((detectOdmLogFile) -eq -1){
+            Write-Host "No logfile after restarting Onedrive, something may be wrong with the Onedrive client that cannot be auto-remediated"
+            Exit 1
         }
 
         if($False -eq (detectOdmRunning)){
-            #ODM is not running, start it and check again
-            startO4B
-            Start-Sleep -s 300
-            if($False -eq (detectOdmRunning)){
-                Write-Host "Could not start Onedrive client"
-                Exit 1
-            }
-        }
-
-        #no logfile while in remediation mode, we'll have to wait a few minutes
-        if((detectOdmLogFile) -eq -1){
-            Start-Sleep -s 600
-        }
-
-        #if still no logfile, we'll have to restart the Onedrive client
-        if((detectOdmLogFile) -eq -1){
-            restartO4B
-            Start-Sleep -s 600
-            if((detectOdmLogFile) -eq -1){
-                Write-Host "No logfile after restarting Onedrive, something may be wrong with the Onedrive client that cannot be auto-remediated"
-                Exit 1
-            }
+            Write-Host "Could not (re)start Onedrive client"
+            Exit 1
         }
 
         #logfile status should be good now, if not, cannot do much more

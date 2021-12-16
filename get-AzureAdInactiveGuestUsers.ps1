@@ -94,3 +94,4 @@ for($i=0; $i -lt $guests.Count; $i++){
 }
 
 $reportData | Export-CSV -Path "guestActivityReport.csv" -Encoding UTF8 -NoTypeInformation
+.\guestActivityReport.csv

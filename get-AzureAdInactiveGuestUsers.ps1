@@ -14,7 +14,6 @@
 #Requires -Modules @{ ModuleName="Az.Accounts "; ModuleVersion="2.7.0" }, @{ ModuleName="Az.Resources"; ModuleVersion="5.1.0" }
 
 Param(
-    [Parameter(Mandatory=$true)][String]$workspaceName,
     [Int]$inactiveThresholdInDays = 90,
     [Switch]$removeInactiveGuests
 )
@@ -24,7 +23,6 @@ $context = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmP
 $token = ([Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.Id.ToString(), $null, [Microsoft.Azure.Commands.Common.Authentication.ShowDialog]::Never, $null, "https://graph.microsoft.com")).AccessToken
             
 $propertiesSelector = @("UserType","UserPrincipalName","Id","DisplayName","ExternalUserState","ExternalUserStateChangeDateTime","CreatedDateTime","CreationType","AccountEnabled")
-
 
 Write-Progress -Activity "Azure AD Guest User Report" -Status "Grabbing all guests in your AD" -Id 1 -PercentComplete 0
 

@@ -97,6 +97,7 @@ function parseOdmLogFileForStatus(){
             12544 { $retVal = "Healthy"}
 		    65536{ $retVal = "Paused"}
             32786{ $retVal = "File merge conflict"}
+            24576{ $retVal = "File merge conflict"}
             8449{ $retVal = "File locked"}
 		    8194{ $retVal = "Disabled"}                        
 		    1854{ $retVal = "Unhealthy"}

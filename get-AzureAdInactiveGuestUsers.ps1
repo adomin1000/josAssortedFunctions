@@ -15,20 +15,28 @@
 
 Param(
     [Parameter(Mandatory=$true)][String]$workspaceName,
-    [Parameter(Mandatory=$true)][String]$subscriptionName,
     [Int]$inactiveThresholdInDays = 90,
     [Switch]$removeInactiveGuests
 )
 
-Login-AzAccount -Subscription $subscriptionName
-$workspace = Get-AzOperationalInsightsWorkspace | Where{$_.Name -eq $workspaceName}
-
+Login-AzAccount -ErrorAction Stop
+$context = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile.DefaultContext
+$token = ([Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.Id.ToString(), $null, [Microsoft.Azure.Commands.Common.Authentication.ShowDialog]::Never, $null, "https://graph.microsoft.com")).AccessToken
+            
 $propertiesSelector = @("UserType","UserPrincipalName","Id","DisplayName","ExternalUserState","ExternalUserStateChangeDateTime","CreatedDateTime","CreationType","AccountEnabled")
 
 
 Write-Progress -Activity "Azure AD Guest User Report" -Status "Grabbing all guests in your AD" -Id 1 -PercentComplete 0
 
-$guests = Get-AzADUser -Filter "UserType eq 'Guest'" -Select $propertiesSelector
+$guests = @()
+$userData = Invoke-RestMethod -Uri "https://graph.microsoft.com/beta/users?`$Filter=UserType eq 'Guest'&`$select=UserType,UserPrincipalName,Id,DisplayName,ExternalUserState,ExternalUserStateChangeDateTime,CreatedDateTime,CreationType,AccountEnabled,signInActivity" -Method GET -Headers @{"Authorization"="Bearer $token"}
+$guests += $userData.value
+while($userData.'@odata.nextLink'){
+    Write-Progress -Activity "Azure AD Guest User Report" -Status "Grabbing all guests in your AD ($($guests.count))" -Id 1 -PercentComplete 0
+    $userData = Invoke-RestMethod -Uri $userData.'@odata.nextLink' -Method GET -Headers @{"Authorization"="Bearer $token"}    
+    $guests += $userData.value
+}
+
 $reportData = @()
 for($i=0; $i -lt $guests.Count; $i++){
     try{$percentComplete = $i/$guests.Count*100}catch{$percentComplete=0}
@@ -38,27 +46,10 @@ for($i=0; $i -lt $guests.Count; $i++){
         $obj | Add-Member -MemberType NoteProperty -Name $property -Value $guests[$i].$property
     }
 
-    #return last logon from LA workspace
-    $query = "SigninLogs | where TimeGenerated < ago(1s) and TimeGenerated > ago(1825d) | where UserId  == `"$($guests[$i].Id)`" | summarize arg_max(TimeGenerated, *) by Identity"
-    $attempts = 0
-    while($true){
-        try{
-            $result = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspace.CustomerId -Query $query -ErrorAction Stop
-            break
-        }catch{
-            Start-Sleep -s 1
-            $attempts++
-        }
-        if($attempts -gt 10){
-            Write-Host "Error querying workspace for $($guests[$i].Id) because of $($_)"
-            break
-        }
-    }
-
-    if($result.Results.TimeGenerated){
-        Write-Host "$($guests[$i].UserPrincipalName) detected last signin: $($result.Results.TimeGenerated)"
-        $obj | Add-Member -MemberType NoteProperty -Name "LastSignIn" -Value ([DateTime]$result.Results.TimeGenerated).ToString("yyyy-MM-dd hh:mm:ss")
-        $obj | Add-Member -MemberType NoteProperty -Name "InactiveDays" -Value ([math]::Round((New-TimeSpan -Start ([DateTime]$result.Results.TimeGenerated) -End (Get-Date)).TotalDays))
+    if($guests[$i].signInActivity -and $guests[$i].signInActivity.lastSignInDateTime){
+        Write-Host "$($guests[$i].UserPrincipalName) detected last signin: $($guests[$i].signInActivity.lastSignInDateTime)"
+        $obj | Add-Member -MemberType NoteProperty -Name "LastSignIn" -Value ([DateTime]$guests[$i].signInActivity.lastSignInDateTime).ToString("yyyy-MM-dd hh:mm:ss")
+        $obj | Add-Member -MemberType NoteProperty -Name "InactiveDays" -Value ([math]::Round((New-TimeSpan -Start ([DateTime]$guests[$i].signInActivity.lastSignInDateTime) -End (Get-Date)).TotalDays))
     }else{
         Write-Host "$($guests[$i].UserPrincipalName) detected last signin: Never"
         $obj | Add-Member -MemberType NoteProperty -Name "InactiveDays" -Value ([math]::Round((New-TimeSpan -Start ([DateTime]$guests[$i].CreatedDateTime) -End (Get-Date)).TotalDays))
@@ -73,7 +64,7 @@ for($i=0; $i -lt $guests.Count; $i++){
             $remove = $True
             Write-Host "Will delete $($guests[$i].UserPrincipalName) because it was never signed in and was created more than $inactiveThresholdInDays days ago"
         }
-        if($obj.LastSignIn -ne "Never" -and [DateTime]$result.Results.TimeGenerated -lt (Get-Date).AddDays($inactiveThresholdInDays*-1)){
+        if($obj.LastSignIn -ne "Never" -and [DateTime]$guests[$i].signInActivity.lastSignInDateTime -lt (Get-Date).AddDays($inactiveThresholdInDays*-1)){
             $remove = $True
             Write-Host "Will delete $($guests[$i].UserPrincipalName) because it was last signed in more than $inactiveThresholdInDays days ago"
         }

@@ -46,10 +46,22 @@ for($i=0; $i -lt $guests.Count; $i++){
         $obj | Add-Member -MemberType NoteProperty -Name $property -Value $guests[$i].$property
     }
 
-    if($guests[$i].signInActivity -and $guests[$i].signInActivity.lastSignInDateTime){
-        Write-Host "$($guests[$i].UserPrincipalName) detected last signin: $($guests[$i].signInActivity.lastSignInDateTime)"
-        $obj | Add-Member -MemberType NoteProperty -Name "LastSignIn" -Value ([DateTime]$guests[$i].signInActivity.lastSignInDateTime).ToString("yyyy-MM-dd hh:mm:ss")
-        $obj | Add-Member -MemberType NoteProperty -Name "InactiveDays" -Value ([math]::Round((New-TimeSpan -Start ([DateTime]$guests[$i].signInActivity.lastSignInDateTime) -End (Get-Date)).TotalDays))
+    $lastSignIn = $Null
+    if($guests[$i].signInActivity){
+        if($guests[$i].signInActivity.lastSignInDateTime -and $guests[$i].signInActivity.lastSignInDateTime -ne "0001-01-01T00:00:00Z"){
+            $lastSignIn = [DateTime]$guests[$i].signInActivity.lastSignInDateTime
+        }
+        if($guests[$i].signInActivity.lastNonInteractiveSignInDateTime -and $guests[$i].signInActivity.lastNonInteractiveSignInDateTime -ne "0001-01-01T00:00:00Z"){
+            if(!$lastSignIn -or [Datetime]$guests[$i].signInActivity.lastNonInteractiveSignInDateTime -gt $lastSignIn){
+                $lastSignIn = [Datetime]$guests[$i].signInActivity.lastNonInteractiveSignInDateTime
+            }
+        }
+    }
+
+    if($lastSignIn){
+        Write-Host "$($guests[$i].UserPrincipalName) detected last signin: $lastSignIn"
+        $obj | Add-Member -MemberType NoteProperty -Name "LastSignIn" -Value $lastSignIn.ToString("yyyy-MM-dd hh:mm:ss")
+        $obj | Add-Member -MemberType NoteProperty -Name "InactiveDays" -Value ([math]::Round((New-TimeSpan -Start ($lastSignIn) -End (Get-Date)).TotalDays))
     }else{
         Write-Host "$($guests[$i].UserPrincipalName) detected last signin: Never"
         $obj | Add-Member -MemberType NoteProperty -Name "InactiveDays" -Value ([math]::Round((New-TimeSpan -Start ([DateTime]$guests[$i].CreatedDateTime) -End (Get-Date)).TotalDays))
@@ -64,7 +76,7 @@ for($i=0; $i -lt $guests.Count; $i++){
             $remove = $True
             Write-Host "Will delete $($guests[$i].UserPrincipalName) because it was never signed in and was created more than $inactiveThresholdInDays days ago"
         }
-        if($obj.LastSignIn -ne "Never" -and [DateTime]$guests[$i].signInActivity.lastSignInDateTime -lt (Get-Date).AddDays($inactiveThresholdInDays*-1)){
+        if($obj.LastSignIn -ne "Never" -and $lastSignIn -lt (Get-Date).AddDays($inactiveThresholdInDays*-1)){
             $remove = $True
             Write-Host "Will delete $($guests[$i].UserPrincipalName) because it was last signed in more than $inactiveThresholdInDays days ago"
         }

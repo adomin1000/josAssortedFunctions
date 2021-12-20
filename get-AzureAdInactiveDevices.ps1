@@ -114,7 +114,7 @@ for($i=0; $i -lt $devices.Count; $i++){
                 if($obj.onPremisesSyncEnabled){
                     Throw "it is synced from an on premises AD, please delete it there"
                 }
-                #Remove-AzADUser -ObjectId $guests[$i].Id -Confirm:$False
+                Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/devices/$($devices[$i].id)" -Method DELETE -Headers @{"Authorization"="Bearer $token"}
                 $obj | Add-Member -MemberType NoteProperty -Name "AutoRemoved" -Value "Yes"
                 Write-Host "Deleted $($devices[$i].displayName)"
             }catch{

@@ -11,7 +11,7 @@
     Created:    16/12/2021
     Updated:    See Gitlab
 #>
-#Requires -Modules @{ ModuleName="Az.Accounts "; ModuleVersion="2.7.0" }, @{ ModuleName="Az.Resources"; ModuleVersion="5.1.0" }
+#Requires -Modules @{ ModuleName="Az.Accounts"; ModuleVersion="2.7.0" }, @{ ModuleName="Az.Resources"; ModuleVersion="5.1.0" }
 
 Param(
     [Int]$inactiveThresholdInDays = 90,

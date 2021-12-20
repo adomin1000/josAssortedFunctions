@@ -1,10 +1,10 @@
 ﻿<#
     .SYNOPSIS
-    Generates a report of all guest users in your tenant, including the last signed in date (if any) based on SignIn logs in Azure Log Analytics.
+    Generates a report of all guest users in your tenant, including the last signed in date (if any) based on signInActivity.
     Optionally, it can remove users if they have been inactive for a given threshold number of days.
 
     If the nonInteractive switch is supplied, the script will leverage Managed Identity (e.g. when running as an Azure Runbook) to log in to the Graph API. 
-    In that case, assign AuditLog.Read.All and Organization.Read.All permissions to the managed identity by using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
+    In that case, assign User.ReadWrite.All (when using 'removeInactiveGuests'), AuditLog.Read.All and Organization.Read.All permissions to the managed identity by using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
 
     .NOTES
     filename:   get-AzureAdInactiveGuestUsers.ps1

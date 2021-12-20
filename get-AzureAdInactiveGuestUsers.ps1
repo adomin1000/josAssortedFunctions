@@ -3,6 +3,9 @@
     Generates a report of all guest users in your tenant, including the last signed in date (if any) based on SignIn logs in Azure Log Analytics.
     Optionally, it can remove users if they have been inactive for a given threshold number of days.
 
+    If the nonInteractive switch is supplied, the script will leverage Managed Identity (e.g. when running as an Azure Runbook) to log in to the Graph API. 
+    In that case, assign AuditLog.Read.All and Organization.Read.All permissions to the managed identity by using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
+
     .NOTES
     filename:   get-AzureAdInactiveGuestUsers.ps1
     author:     Jos Lieben / jos@lieben.nu
@@ -15,22 +18,40 @@
 
 Param(
     [Int]$inactiveThresholdInDays = 90,
-    [Switch]$removeInactiveGuests
+    [Switch]$removeInactiveGuests,
+    [Switch]$nonInteractive
 )
 
-Login-AzAccount -ErrorAction Stop
+[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Web")
+$res = [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
+try{
+    if($nonInteractive){
+        Write-Output "Logging in with MI"
+        $Null = Connect-AzAccount -Identity -ErrorAction Stop
+        Write-Output "Logged in as MI"
+    }else{
+        Login-AzAccount -ErrorAction Stop
+    }
+}catch{
+    Throw $_
+}
+
 $context = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile.DefaultContext
 $token = ([Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.Id.ToString(), $null, [Microsoft.Azure.Commands.Common.Authentication.ShowDialog]::Never, $null, "https://graph.microsoft.com")).AccessToken
             
 $propertiesSelector = @("UserType","UserPrincipalName","Id","DisplayName","ExternalUserState","ExternalUserStateChangeDateTime","CreatedDateTime","CreationType","AccountEnabled")
 
-Write-Progress -Activity "Azure AD Guest User Report" -Status "Grabbing all guests in your AD" -Id 1 -PercentComplete 0
+if(!$nonInteractive){
+    Write-Progress -Activity "Azure AD Guest User Report" -Status "Grabbing all guests in your AD" -Id 1 -PercentComplete 0
+}
 
 $guests = @()
 $userData = Invoke-RestMethod -Uri "https://graph.microsoft.com/beta/users?`$Filter=UserType eq 'Guest'&`$select=UserType,UserPrincipalName,Id,DisplayName,ExternalUserState,ExternalUserStateChangeDateTime,CreatedDateTime,CreationType,AccountEnabled,signInActivity" -Method GET -Headers @{"Authorization"="Bearer $token"}
 $guests += $userData.value
 while($userData.'@odata.nextLink'){
-    Write-Progress -Activity "Azure AD Guest User Report" -Status "Grabbing all guests in your AD ($($guests.count))" -Id 1 -PercentComplete 0
+    if(!$nonInteractive){
+        Write-Progress -Activity "Azure AD Guest User Report" -Status "Grabbing all guests in your AD ($($guests.count))" -Id 1 -PercentComplete 0
+    }
     $userData = Invoke-RestMethod -Uri $userData.'@odata.nextLink' -Method GET -Headers @{"Authorization"="Bearer $token"}    
     $guests += $userData.value
 }
@@ -38,7 +59,9 @@ while($userData.'@odata.nextLink'){
 $reportData = @()
 for($i=0; $i -lt $guests.Count; $i++){
     try{$percentComplete = $i/$guests.Count*100}catch{$percentComplete=0}
-    Write-Progress -Activity "Azure AD Guest User Report" -Status "Processing $i/$($guests.Count) $($guests[$i].UserPrincipalName)" -Id 1 -PercentComplete $percentComplete
+    if(!$nonInteractive){
+        Write-Progress -Activity "Azure AD Guest User Report" -Status "Processing $i/$($guests.Count) $($guests[$i].UserPrincipalName)" -Id 1 -PercentComplete $percentComplete
+    }
     $obj = [PSCustomObject]@{}
     foreach($property in $propertiesSelector){
         $obj | Add-Member -MemberType NoteProperty -Name $property -Value $guests[$i].$property
@@ -94,5 +117,7 @@ for($i=0; $i -lt $guests.Count; $i++){
     $reportData+=$obj
 }
 
-$reportData | Export-CSV -Path "guestActivityReport.csv" -Encoding UTF8 -NoTypeInformation
-.\guestActivityReport.csv
+if(!$nonInteractive){
+    $reportData | Export-CSV -Path "guestActivityReport.csv" -Encoding UTF8 -NoTypeInformation
+    .\guestActivityReport.csv
+}

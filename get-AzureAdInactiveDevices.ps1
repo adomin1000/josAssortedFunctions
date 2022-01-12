@@ -4,7 +4,8 @@
     Optionally, it can remove devices if they have been inactive for a given threshold number of days.
 
     If the nonInteractive switch is supplied, the script will leverage Managed Identity (e.g. when running as an Azure Runbook) to log in to the Graph API. 
-    In that case, assign Device.ReadWrite.All (when using 'removeInactiveDevices') or Device.Read.All permissions to the managed identity by using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
+    Assign the Device.Read.All permissions to the managed identity by using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
+    In addition assign the cloud device administrator (Azure AD) role to the Managed Identity.
 
     .NOTES
     filename:   get-AzureAdInactiveDevices.ps1

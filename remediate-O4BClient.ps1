@@ -92,12 +92,16 @@ function parseOdmLogFileForStatus(){
         } 
         switch($progressState){
             0{ $retVal = "Healthy"}
+            10 { $retVal = "File merge conflict"}
             42{ $retVal = "Healthy"}
+            256 { $retVal = "File locked"}
+            258 { $retVal = "File merge conflict"}
             16777216{ $retVal = "Healthy"}
             12544 { $retVal = "Healthy"}
 		    65536{ $retVal = "Paused"}
             32786{ $retVal = "File merge conflict"}
             24576{ $retVal = "File merge conflict"}
+            25088 { $retVal = "File merge conflict"}
             8449{ $retVal = "File locked"}
 		    8194{ $retVal = "Disabled"}                        
 		    1854{ $retVal = "Unhealthy"}

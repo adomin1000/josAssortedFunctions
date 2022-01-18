@@ -31,7 +31,7 @@ Param(
     $tenantId,
     [Parameter(Mandatory=$true)]$userUPN,
     $resource="https://graph.microsoft.com",
-    $clientId="1950a258-227b-4e31-a9cf-717495945fc2" #use 1b730954-1685-4b74-9bfd-dac224a7b894 for audit/sign in log or other things that only work through the AzureAD module
+    $clientId="1950a258-227b-4e31-a9cf-717495945fc2" #use 1b730954-1685-4b74-9bfd-dac224a7b894 for audit/sign in logs or other things that only work through the AzureAD module, use d1ddf0e4-d672-4dae-b554-9d5bdfd93547 for Intune
 )
 
 $strCurrentTimeZone = (Get-WmiObject win32_timezone).StandardName
@@ -84,12 +84,12 @@ if(!$refreshToken){
 
     try{
         Write-Verbose "Attempting device sign in method"
-        $response = Invoke-RestMethod -Method POST -UseBasicParsing -Uri "https://login.microsoftonline.com/$tenantId/oauth2/devicecode" -ContentType "application/x-www-form-urlencoded" -Body "resource=https%3A%2F%2Fgraph.windows.net&client_id=$clientId"
+        $response = Invoke-RestMethod -Method POST -UseBasicParsing -Uri "https://login.microsoftonline.com/$tenantId/oauth2/devicecode" -ContentType "application/x-www-form-urlencoded" -Body "resource=https%3A%2F%2Fgraph.microsoft.com&client_id=$clientId"
         Write-Output $response.message
         $waited = 0
         while($true){
             try{
-                $authResponse = Invoke-RestMethod -uri "https://login.microsoftonline.com/$tenantId/oauth2/token" -ContentType "application/x-www-form-urlencoded" -Method POST -Body "grant_type=device_code&resource=https%3A%2F%2Fgraph.windows.net&code=$($response.device_code)&client_id=$clientId" -ErrorAction Stop
+                $authResponse = Invoke-RestMethod -uri "https://login.microsoftonline.com/$tenantId/oauth2/token" -ContentType "application/x-www-form-urlencoded" -Method POST -Body "grant_type=device_code&resource=https%3A%2F%2Fgraph.microsoft.com&code=$($response.device_code)&client_id=$clientId" -ErrorAction Stop
                 $refreshToken = $authResponse.refresh_token
                 break
             }catch{

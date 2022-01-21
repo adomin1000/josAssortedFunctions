@@ -25,7 +25,7 @@ Param(
     [Int]$inactiveThresholdInDays = 90,
     [Switch]$removeInactiveDevices,
     [Switch]$firstDisableDevices,
-    [Switch]$disableDurationInDays = 30,
+    [Int]$disableDurationInDays = 30,
     [Switch]$nonInteractive
 )
 

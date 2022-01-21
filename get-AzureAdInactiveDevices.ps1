@@ -1,11 +1,14 @@
 ﻿<#
     .SYNOPSIS
     Generates a report of all devices in your tenant, including the last signed in date (if any) based on the last activity.
-    Optionally, it can remove devices if they have been inactive for a given threshold number of days.
+    Optionally, it can remove devices if they have been inactive for a given threshold number of days by supplying the removeInactiveDevices switch
 
     If the nonInteractive switch is supplied, the script will leverage Managed Identity (e.g. when running as an Azure Runbook) to log in to the Graph API. 
     Assign the Device.Read.All permissions to the managed identity by using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
     In addition assign the cloud device administrator (Azure AD) role to the Managed Identity.
+
+    If the firstDisableDevices switch is also supplied, devices will not be deleted when the inactiveThresholdInDays is met, but disabled instead. Then after the 
+    disableDurationInDays threshold, they will be deleted.
 
     .NOTES
     filename:   get-AzureAdInactiveDevices.ps1
@@ -21,6 +24,8 @@
 Param(
     [Int]$inactiveThresholdInDays = 90,
     [Switch]$removeInactiveDevices,
+    [Switch]$firstDisableDevices,
+    [Switch]$disableDurationInDays = 30,
     [Switch]$nonInteractive
 )
 
@@ -41,7 +46,7 @@ try{
 $context = [Microsoft.Azure.Commands.Common.Authentication.Abstractions.AzureRmProfileProvider]::Instance.Profile.DefaultContext
 $token = ([Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.Id.ToString(), $null, [Microsoft.Azure.Commands.Common.Authentication.ShowDialog]::Never, $null, "https://graph.microsoft.com")).AccessToken
             
-$propertiesSelector = @("id","accountEnabled","createdDateTime","approximateLastSignInDateTime","deviceId","displayName","onPremisesSyncEnabled","operatingSystem","profileType","trustType","sourceType")
+$propertiesSelector = @("extensionAttributes","id","accountEnabled","createdDateTime","approximateLastSignInDateTime","deviceId","displayName","onPremisesSyncEnabled","operatingSystem","profileType","trustType","sourceType")
 
 if(!$nonInteractive){
     Write-Progress -Activity "Azure AD Device Report" -Status "Grabbing all devices in your AD" -Id 1 -PercentComplete 0
@@ -99,32 +104,64 @@ for($i=0; $i -lt $devices.Count; $i++){
 
     if($removeInactiveDevices){
         $remove = $False
+        if($firstDisableDevices){
+            $deleteDisableString = "delete"
+        }else{
+            $deleteDisableString = "disable"
+        }
         if($obj.LastSignIn -eq "Never" -and ([DateTime]$created -lt (Get-Date).AddDays($inactiveThresholdInDays*-1))){
             $remove = $True
-            Write-Host "Will delete $($devices[$i].displayName) because it was never signed in and was created more than $inactiveThresholdInDays days ago"
+            Write-Host "Will $deleteDisableString $($devices[$i].displayName) because it was never signed in and was created more than $inactiveThresholdInDays days ago"
         }
         if($obj.LastSignIn -ne "Never" -and $lastSignIn -lt (Get-Date).AddDays($inactiveThresholdInDays*-1)){
             $remove = $True
-            Write-Host "Will delete $($devices[$i].displayName) because it was last signed in more than $inactiveThresholdInDays days ago"
+            Write-Host "Will $deleteDisableString $($devices[$i].displayName) because it was last signed in more than $inactiveThresholdInDays days ago"
         }
 
         if($remove){
             Try{
                 if($obj.operatingSystem -eq "Unknown"){
-                    Throw "it is an autopilot object and has to be deleted in AutoPilot"
+                    Throw "it is an autopilot object and has to be deleted or deactivated in AutoPilot"
                 }
                 if($obj.onPremisesSyncEnabled){
-                    Throw "it is synced from an on premises AD, please delete it there"
+                    Throw "it is synced from an on premises AD, please delete or deactivate it there"
                 }
-                Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/devices/$($devices[$i].id)" -Method DELETE -Headers @{"Authorization"="Bearer $token"}
-                $obj | Add-Member -MemberType NoteProperty -Name "AutoRemoved" -Value "Yes"
-                Write-Host "Deleted $($devices[$i].displayName)"
+                if($firstDisableDevices){
+                    $remove = $False
+                    if($obj.accountEnabled -eq $True){
+                        #device is active, we need to disable it as inactivity threshold is met
+                        $body = @{
+                            "extensionAttributes"= @{
+                                "extensionAttribute6"= Get-Date
+                            }
+                            "accountEnabled"= $false
+                        }
+                        Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/devices/$($devices[$i].id)" -Body ($body | convertto-json -Depth 5) -Method PATCH -Headers @{"Authorization"="Bearer $token"}
+                        $obj | Add-Member -MemberType NoteProperty -Name "Result" -Value "Disabled"
+                        Write-Host "Disabled $($devices[$i].displayName)"
+                    }else{
+                        if($obj.extensionAttributes.extensionAttribute6){
+                            if([DateTime]$obj.extensionAttributes.extensionAttribute6 -le (Get-Date).AddDays($disableDurationInDays*-1)){
+                                $remove = $True
+                            }else{
+                                $obj | Add-Member -MemberType NoteProperty -Name "Result" -Value "Disabled"
+                            }
+                        }else{
+                            $remove = $True
+                        }
+                    }
+                }
+                if($remove){
+                    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/devices/$($devices[$i].id)" -Method DELETE -Headers @{"Authorization"="Bearer $token"}
+                    $obj | Add-Member -MemberType NoteProperty -Name "Result" -Value "Removed"
+                    Write-Host "Deleted $($devices[$i].displayName)"
+                }
             }catch{
-                $obj | Add-Member -MemberType NoteProperty -Name "AutoRemoved" -Value "Failed"
-                Write-Host "Failed to delete $($devices[$i].displayName) because $_"
+                $obj | Add-Member -MemberType NoteProperty -Name "Result" -Value "Failed"
+                Write-Host "Failed to delete or disable $($devices[$i].displayName) because $_"
             }
         }else{
-            $obj | Add-Member -MemberType NoteProperty -Name "AutoRemoved" -Value "No"
+            $obj | Add-Member -MemberType NoteProperty -Name "Result" -Value "N/A"
         }
     }
     $reportData+=$obj

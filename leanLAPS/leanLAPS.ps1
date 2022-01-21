@@ -22,10 +22,10 @@ $removeOtherLocalAdmins = $False #if set to True, will remove ALL other local ad
 $doNotRunOnServers = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
 $markerFile = Join-Path $Env:TEMP -ChildPath "leanLAPS.marker"
 $markerFileExists = (Test-Path $markerFile)
-$approvedAdmins = @( #specify names for Local AD groups or SID's for Azure groups such as Global Admins and Device Administrators. These are specific to your tenant, you can get them on a device by running: ([ADSI]::new("WinNT://$($env:COMPUTERNAME)/$((New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-544")).Translate([System.Security.Principal.NTAccount]).Value.Split("\")[1]),Group")).Invoke('Members') | % {([ADSI]$_).Path.Split("/")[-1]}
+$approvedAdmins = @( #specify SID's for Azure groups such as Global Admins and Device Administrators or for local or domain users to not remove from local admins. These are specific to your tenant, you can get them on a device by running: ([ADSI]::new("WinNT://$($env:COMPUTERNAME)/$((New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-544")).Translate([System.Security.Principal.NTAccount]).Value.Split("\")[1]),Group")).Invoke('Members') | % {"$((New-Object -TypeName System.Security.Principal.SecurityIdentifier -ArgumentList @([Byte[]](([ADSI]$_).properties.objectSid).Value, 0)).Value) <--- a.k.a: $(([ADSI]$_).Path.Split("/")[-1])"}
 "S-1-12-1-3524033542-1298357157-3149679747-1970349937"
 "S-1-12-1-3862487121-1222458618-970102617-4043066380"
-"Domain Admins"
+"S-1-12-1-2121731242-1182275348-3172105160-2279206088"
 )
 
 
@@ -111,8 +111,8 @@ try{
     $administratorsGroupName = (New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-544")).Translate([System.Security.Principal.NTAccount]).Value.Split("\")[1]
     Write-CustomEventLog "local administrators group is called $administratorsGroupName"
     $group = [ADSI]::new("WinNT://$($env:COMPUTERNAME)/$($administratorsGroupName),Group")
-    $administrators = $group.Invoke('Members') | % {([ADSI]$_).Path.Split("/")[-1]}
-
+    $administrators = $group.Invoke('Members') | % {(New-Object -TypeName System.Security.Principal.SecurityIdentifier -ArgumentList @([Byte[]](([ADSI]$_).properties.objectSid).Value, 0)).Value}
+    
     Write-CustomEventLog "There are $($administrators.count) readable accounts in $administratorsGroupName"
 
     if(!$administrators -or $administrators -notcontains $localAdminName){

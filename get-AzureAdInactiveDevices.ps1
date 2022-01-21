@@ -105,9 +105,9 @@ for($i=0; $i -lt $devices.Count; $i++){
     if($removeInactiveDevices){
         $remove = $False
         if($firstDisableDevices){
-            $deleteDisableString = "delete"
-        }else{
             $deleteDisableString = "disable"
+        }else{
+            $deleteDisableString = "delete"
         }
         if($obj.LastSignIn -eq "Never" -and ([DateTime]$created -lt (Get-Date).AddDays($inactiveThresholdInDays*-1))){
             $remove = $True

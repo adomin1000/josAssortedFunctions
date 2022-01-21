@@ -104,18 +104,13 @@ for($i=0; $i -lt $devices.Count; $i++){
 
     if($removeInactiveDevices){
         $remove = $False
-        if($firstDisableDevices){
-            $deleteDisableString = "disable"
-        }else{
-            $deleteDisableString = "delete"
-        }
         if($obj.LastSignIn -eq "Never" -and ([DateTime]$created -lt (Get-Date).AddDays($inactiveThresholdInDays*-1))){
             $remove = $True
-            Write-Host "Will $deleteDisableString $($devices[$i].displayName) because it was never signed in and was created more than $inactiveThresholdInDays days ago"
+            Write-Host "Will delete or disable $($devices[$i].displayName) because it was never signed in and was created more than $inactiveThresholdInDays days ago"
         }
         if($obj.LastSignIn -ne "Never" -and $lastSignIn -lt (Get-Date).AddDays($inactiveThresholdInDays*-1)){
             $remove = $True
-            Write-Host "Will $deleteDisableString $($devices[$i].displayName) because it was last signed in more than $inactiveThresholdInDays days ago"
+            Write-Host "Will delete or disable $($devices[$i].displayName) because it was last signed in more than $inactiveThresholdInDays days ago"
         }
 
         if($remove){
@@ -132,16 +127,16 @@ for($i=0; $i -lt $devices.Count; $i++){
                         #device is active, we need to disable it as inactivity threshold is met
                         $body = @{
                             "extensionAttributes"= @{
-                                "extensionAttribute6"= Get-Date
+                                "extensionAttribute6"= "$((Get-Date).ToFileTimeUtc())"
                             }
                             "accountEnabled"= $false
                         }
-                        Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/devices/$($devices[$i].id)" -Body ($body | convertto-json -Depth 5) -Method PATCH -Headers @{"Authorization"="Bearer $token"}
+                        Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/devices/$($devices[$i].id)" -Body ($body | convertto-json -Depth 5) -Method PATCH -Headers @{"Authorization"="Bearer $token"} -ContentType "application/json"
                         $obj | Add-Member -MemberType NoteProperty -Name "Result" -Value "Disabled"
                         Write-Host "Disabled $($devices[$i].displayName)"
                     }else{
                         if($obj.extensionAttributes.extensionAttribute6){
-                            if([DateTime]$obj.extensionAttributes.extensionAttribute6 -le (Get-Date).AddDays($disableDurationInDays*-1)){
+                            if([DateTime]::FromFileTime($obj.extensionAttributes.extensionAttribute6) -le (Get-Date).AddDays($disableDurationInDays*-1)){
                                 $remove = $True
                             }else{
                                 $obj | Add-Member -MemberType NoteProperty -Name "Result" -Value "Disabled"

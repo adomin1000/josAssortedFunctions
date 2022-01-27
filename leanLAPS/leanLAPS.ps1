@@ -115,7 +115,7 @@ try{
     
     Write-CustomEventLog "There are $($administrators.count) readable accounts in $administratorsGroupName"
 
-    if(!$administrators -or $administrators -notcontains $localAdminName){
+    if(!$administrators -or $administrators -notcontains $localAdmin.SID){
         Write-CustomEventLog "$localAdminName is not a local administrator, adding..."
         $res = Add-LocalGroupMember -Group $administratorsGroupName -Member $localAdminName -Confirm:$False -ErrorAction Stop
         Write-CustomEventLog "Added $localAdminName to the local administrators group"
@@ -123,7 +123,7 @@ try{
     #remove other local admins if specified, only executes if adding the new local admin succeeded
     if($removeOtherLocalAdmins){
         foreach($administrator in $administrators){
-            if($administrator -ne $localAdminName -and $approvedAdmins -notcontains $administrator){
+            if($administrator -ne $localAdmin.SID -and $approvedAdmins -notcontains $administrator){
                 Write-CustomEventLog "removeOtherLocalAdmins set to True, removing $($administrator) from Local Administrators"
                 $res = Remove-LocalGroupMember -Group $administratorsGroupName -Member $administrator -Confirm:$False
                 Write-CustomEventLog "Removed $administrator from Local Administrators"

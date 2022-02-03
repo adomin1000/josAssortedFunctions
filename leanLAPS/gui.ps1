@@ -38,9 +38,11 @@ function getDeviceInfo {
             $deviceStatuses = (Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value
             foreach($device in $deviceStatuses){
                 if($deviceStatus){
-                    if([DateTime]($device.postRemediationDetectionScriptOutput -Replace(".* changed on ","")) -gt [DateTime]($deviceStatus.postRemediationDetectionScriptOutput -Replace(".* changed on ",""))){
-                        $deviceStatus = $device
-                    }
+                    try{
+                        if([DateTime]($device.postRemediationDetectionScriptOutput -Replace(".* changed on ","")) -gt [DateTime]($deviceStatus.postRemediationDetectionScriptOutput -Replace(".* changed on ",""))){
+                            $deviceStatus = $device
+                        }
+                    }catch{$Null}
                 }else{
                     $deviceStatus = $device
                 }

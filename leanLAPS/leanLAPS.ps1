@@ -17,7 +17,7 @@
 ####CONFIG
 $minimumPasswordLength = 21
 $publicEncryptionKey = "" #if you supply a public encryption key, leanLaps will use this to encrypt the password, ensuring it will only be in encrypted form in Proactive Remediations
-$localAdminName = "LCAdmin"
+$localAdminName = 'LCAdmin'
 $removeOtherLocalAdmins = $False #if set to True, will remove ALL other local admins, including those set through AzureAD device settings
 $doNotRunOnServers = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
 $markerFile = Join-Path $Env:TEMP -ChildPath "leanLAPS.marker"

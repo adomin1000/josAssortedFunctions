@@ -19,6 +19,7 @@ $minimumPasswordLength = 21
 $publicEncryptionKey = "" #if you supply a public encryption key, leanLaps will use this to encrypt the password, ensuring it will only be in encrypted form in Proactive Remediations
 $localAdminName = 'LCAdmin'
 $removeOtherLocalAdmins = $False #if set to True, will remove ALL other local admins, including those set through AzureAD device settings
+$disableBuiltinAdminAccount = $False #Disables the built in admin account (which cannot be removed). Usually not needed as most OOBE setups have already done this
 $doNotRunOnServers = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
 $markerFile = Join-Path $Env:TEMP -ChildPath "leanLAPS.marker"
 $markerFileExists = (Test-Path $markerFile)
@@ -123,6 +124,16 @@ try{
     #remove other local admins if specified, only executes if adding the new local admin succeeded
     if($removeOtherLocalAdmins){
         foreach($administrator in $administrators){
+            if($administrator.EndsWith("-500")){
+                Write-CustomEventLog "Not removing $($administrator) because it is a built-in account and cannot be removed"
+                if($disableBuiltinAdminAccount){
+                    if((Get-LocalUser -SID $administrator).Enabled){
+                        $res = Disable-LocalUser -SID $administrator -Confirm:$False
+                        Write-CustomEventLog "Disabled $($administrator) because it is a built-in account and `$disableBuiltinAdminAccount is set to `$True"
+                    }
+                }
+                continue
+            }
             if($administrator -ne $localAdmin.SID.Value -and $approvedAdmins -notcontains $administrator){
                 Write-CustomEventLog "removeOtherLocalAdmins set to True, removing $($administrator) from Local Administrators"
                 $res = Remove-LocalGroupMember -Group $administratorsGroupName -Member $administrator -Confirm:$False

@@ -68,7 +68,8 @@ if($mode -eq "detect"){
 #remediation logic
 try{
     $rasProfiles[$targetPropertyMatch.LineNumber-1] = "$targetProperty=$($desiredValue)"
-    $rasProfiles | Out-File -FilePath $rasFilePath -Force -Confirm:$False -ErrorAction Stop
+    $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
+    [System.IO.File]::WriteAllLines($rasFilePath, $rasProfiles, $Utf8NoBomEncoding)
     Write-Host "$connectionName VPN Profile $targetProperty updated to $desiredValue"
     Exit 0
 }catch{

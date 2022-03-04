@@ -34,22 +34,21 @@ $orphanedSites = 0
 $unsharedSites = 0
 
 Get-PnPMicrosoft365Group -IncludeSiteUrl -IncludeOwners | Where{$_.SiteUrl -and (($_.Visibility -eq "Public" -and $public) -or ($_.Visibility -eq "Private" -and $private))} | % {
-    if($_.Owners.Count -gt 0){
-        continue
-    }
-    Write-Output "Processing orphaned site: $($_.SiteUrl)"
-    $orphanedSites++
-    $site = Get-PnPTenantSite -Identity $_.SiteUrl
-    if($site.SharingCapability -ne "Disabled"){
-        try{
-            if(!$readOnly){set-pnptenantsite -Identity $site.Url -SharingCapability Disabled}
-            Write-Host "Unshared $($_.SiteUrl)" -ForegroundColor Green
-            $unsharedSites++
-        }catch{
-            Write-Host "Failed to unshare: $($_.SiteUrl)" -ForegroundColor Red
+    if([Int]$_.Owners.Count -eq 0){
+        Write-Output "Processing orphaned site: $($_.SiteUrl) $($_.Owners.Count)"
+        $orphanedSites++
+        $site = Get-PnPTenantSite -Identity $_.SiteUrl
+        if($site.SharingCapability -ne "Disabled"){
+            try{
+                if(!$readOnly){set-pnptenantsite -Identity $site.Url -SharingCapability Disabled}
+                Write-Host "Unshared $($_.SiteUrl)" -ForegroundColor Green
+                $unsharedSites++
+            }catch{
+                Write-Host "Failed to unshare: $($_.SiteUrl)" -ForegroundColor Red
+            }
+        }else{
+            Write-Host "$($_.SiteUrl) already unshared" -ForegroundColor Green
         }
-    }else{
-        Write-Host "$($_.SiteUrl) already unshared" -ForegroundColor Green
     }
 }
 

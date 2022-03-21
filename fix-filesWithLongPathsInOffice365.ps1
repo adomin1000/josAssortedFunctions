@@ -156,7 +156,7 @@ function EditCSV {
     #Variables MUST have script scope to allow form to see them
     $script:CsvData = import-csv $csvPath -Encoding UTF8 -Delimiter "," | Sort-Object -Descending -Property {[int]$_."Deepest Child Path Depth"}
     if($script:csvData.Count -le 0){
-        Throw "You specified an empty CSV file! Try again without precreating the CSV file so this script can create it for you at the specified path."
+        Throw "You specified an empty CSV file OR the target site(s) did not have any long path files. Try again with different sites or without precreating the CSV file."
     }
     $script:dt = new-object System.Data.DataTable
     $columns = $CsvData[0].psobject.Properties | Select-Object name -ExpandProperty name

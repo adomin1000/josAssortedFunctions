@@ -121,17 +121,24 @@ try{
         $res = Add-LocalGroupMember -Group $administratorsGroupName -Member $localAdminName -Confirm:$False -ErrorAction Stop
         Write-CustomEventLog "Added $localAdminName to the local administrators group"
     }
+
+    #disable built in admin account if specified
+    foreach($administrator in $administrators){
+        if($administrator.EndsWith("-500")){
+            if($disableBuiltinAdminAccount){
+                if((Get-LocalUser -SID $administrator).Enabled){
+                    $res = Disable-LocalUser -SID $administrator -Confirm:$False
+                    Write-CustomEventLog "Disabled $($administrator) because it is a built-in account and `$disableBuiltinAdminAccount is set to `$True"
+                }
+            }
+        }
+    }
+
     #remove other local admins if specified, only executes if adding the new local admin succeeded
     if($removeOtherLocalAdmins){
         foreach($administrator in $administrators){
             if($administrator.EndsWith("-500")){
                 Write-CustomEventLog "Not removing $($administrator) because it is a built-in account and cannot be removed"
-                if($disableBuiltinAdminAccount){
-                    if((Get-LocalUser -SID $administrator).Enabled){
-                        $res = Disable-LocalUser -SID $administrator -Confirm:$False
-                        Write-CustomEventLog "Disabled $($administrator) because it is a built-in account and `$disableBuiltinAdminAccount is set to `$True"
-                    }
-                }
                 continue
             }
             if($administrator -ne $localAdmin.SID.Value -and $approvedAdmins -notcontains $administrator){

@@ -1,6 +1,6 @@
 ﻿<#
     .SYNOPSIS
-    Automatically right sizes a given VM
+    Automatically right sizes a given VM based on CPU, memory, performance rating and cost. Can run in many modes and is highly configurable (WhatIf, Force, etc)
 
     .NOTES
     filename: AADRS.psm1
@@ -128,11 +128,11 @@ function get-vmRightSize{
     $vCPUTrigger = 0.75 #if a CPU is over 75% + the differerence percent on average, a vCPU should be added. If under 75% - the difference percent, the optimum amount should be calculated
     $memoryTrigger = 0.75 #if this percentage of memory + the difference percent is in use on average, more should be added. If under this percentage - the difference percent, memory should be recalculated
     $rightSizingMinimumDifferencePercent = 0.10 #minimum difference/buffer of 10% to avoid VM's getting resized back and forth every time you call this function
-    $minMemoryGB = 4 #will never assign less than this (even if you've whitelisted VM's with more)
-    $maxMemoryGB = 32 #will never assign more than this (even if you've whitelisted VM's with more)
+    $minMemoryGB = 4 #will never assign less than this (even if you've allowed VM's with more)
+    $maxMemoryGB = 32 #will never assign more than this (even if you've allowed VM's with more)
     $minvCPUs = 2 #min 2 required for network acceleration!
     $maxvCPUs = 12 #in no case will this function assign a vmtype with more vCPU's than this
-    #the following is a 'whitelist' of VM types to prevent the function from selecting undesired VM types
+    #the following is a 'allowedList' of VM types to prevent the function from selecting undesired VM types
     #this function will select the optimum VM that meets CPU/MEM requirements based first on cost, then performance, then version (if known)
     $allowedVMTypes = @("Standard_D2ds_v4","Standard_D4ds_v4","Standard_D8ds_v4","Standard_D2ds_v5","Standard_D4ds_v5","Standard_D8ds_v5","Standard_E2ds_v4","Standard_E4ds_v4","Standard_E8ds_v4","Standard_E2ds_v5","Standard_E4ds_v5","Standard_E8ds_v5")
     #####END OF OPTIONAL CONFIGURATION#########
@@ -178,7 +178,7 @@ function get-vmRightSize{
         }
     }
 
-    #enrich all whitelisted VM's with pricing data and remove any that are not availabe in the selected region
+    #enrich all allowed VM's with pricing data and remove any that are not availabe in the selected region
     $selectedVMTypes = @()
     foreach($allowedVMType in $allowedVMTypes){
         if($azureAvailableVMSizes.Name -contains $allowedVMType){

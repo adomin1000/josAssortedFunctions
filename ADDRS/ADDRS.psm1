@@ -163,9 +163,12 @@ function get-vmRightSize{
     #use a global var to cache data between subsequent calls to list all available Azure VM sizes in the region
     if(!$global:azureAvailableVMSizes){
         try{
-            $global:azureAvailableVMSizes = Get-AzVMSize -Location $region
+            Write-Verbose "Caching available VM sizes in $region"
+            $global:azureAvailableVMSizes = Get-AzVMSize -Location $region -ErrorAction Stop
+            Write-Verbose "Cached the following available VM types in $region :"
+            Write-Verbose $global:azureAvailableVMSizes.Name -Join ","
         }catch{
-            Throw "$targetVMName failed to retrieve available Azure VM sizes in your region because of $_"
+            Throw "$targetVMName failed to retrieve available Azure VM sizes in region $region because of $_"
         }
     }
     #use a global var to cache data between subsequent calls to list cost and performance data in the selected region
@@ -204,9 +207,9 @@ function get-vmRightSize{
     try{
         $targetVM = Get-AzVM -Name $targetVMName
         $targetVMPricing = $Null
-        $targetVMPricing = $azureVMPrices.listVmInformations | where{$_.name -eq $targetVM.HardwareProfile.VmSize}
+        $targetVMPricing = $azureVMPrices | where{$_.name -eq $targetVM.HardwareProfile.VmSize}
 
-        $targetVMCurrentHardware = $azureAvailableVMSizes | where{$_.Name -eq $targetVM.HardwareProfile.VmSize}
+        $targetVMCurrentHardware = $global:azureAvailableVMSizes | where{$_.Name -eq $targetVM.HardwareProfile.VmSize}
         if(!$targetVMCurrentHardware){
             Throw "Current VM type $($targetVM.HardwareProfile.VmSize) could not be found in Azure's Available VM list, please resize manually to a currently supported size before using this function"
         }

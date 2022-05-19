@@ -211,7 +211,7 @@ function get-vmRightSize{
 
         $targetVMCurrentHardware = $global:azureAvailableVMSizes | where{$_.Name -eq $targetVM.HardwareProfile.VmSize}
         if(!$targetVMCurrentHardware){
-            Throw "Current VM type $($targetVM.HardwareProfile.VmSize) could not be found in Azure's Available VM list, please resize manually to a currently supported size before using this function"
+            Throw "Current VM type $($targetVM.HardwareProfile.VmSize) could not be found in Azure's Available VM list, please resize manually to a currently supported size before using this function or wait until it becomes available again (this is sometimes transitive while Msft scales to customer demand)"
         }
         Write-Verbose "$targetVMName currently runs on $($targetVMCurrentHardware.NumberOfCores) vCPU's and $($targetVMCurrentHardware.MemoryInMB)MB memory ($($targetVM.HardwareProfile.VmSize))"
     }catch{

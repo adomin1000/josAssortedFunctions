@@ -1,6 +1,9 @@
 ﻿<#
     .SYNOPSIS
     Automatically right sizes a given VM based on CPU, memory, performance rating and cost. Can run in many modes and is highly configurable (WhatIf, Force, etc)
+    Check Get-Help for the following functions to determine which one to use:
+    * set-vmRightSize 
+    * set-rsgRightSize
 
     .NOTES
     filename: AADRS.psm1
@@ -8,6 +11,7 @@
     copyright: https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
     site: https://www.lieben.nu/liebensraum/2022/05/automatic-modular-rightsizing-of-azure-vms-with-special-focus-on-azure-virtual-desktop/
     Created: 16/05/2022
+    Updated: see Git: https://gitlab.com/Lieben/assortedFunctions/-/tree/master/ADDRS
 #>
 
 function set-vmToSize{
@@ -124,6 +128,15 @@ function get-vmRightSize{
         [Int]$measurePeriodHours = 152 #lookback period for a VM's performance while it was online, this is used to calculate the optimum. It is not recommended to size multiple times in this period!
     )
     
+    $script:reportRow = [PSCustomObject]@{
+        "vmName"=$targetVMName
+        "currentSize"=$Null
+        "targetSize"=$Null
+        "resized"=$False
+        "costImpactPercent"=$Null
+        "reason"=$Null
+    }
+
     #####CONFIGURATION##########################
     $vCPUTrigger = 0.75 #if a CPU is over 75% + the differerence percent on average, a vCPU should be added. If under 75% - the difference percent, the optimum amount should be calculated
     $memoryTrigger = 0.75 #if this percentage of memory + the difference percent is in use on average, more should be added. If under this percentage - the difference percent, memory should be recalculated
@@ -135,6 +148,7 @@ function get-vmRightSize{
     #the following is a 'allowedList' of VM types to prevent the function from selecting undesired VM types
     #this function will select the optimum VM that meets CPU/MEM requirements based first on cost, then performance, then version (if known)
     $allowedVMTypes = @("Standard_D2ds_v4","Standard_D4ds_v4","Standard_D8ds_v4","Standard_D2ds_v5","Standard_D4ds_v5","Standard_D8ds_v5","Standard_E2ds_v4","Standard_E4ds_v4","Standard_E8ds_v4","Standard_E2ds_v5","Standard_E4ds_v5","Standard_E8ds_v5")
+    $defaultSize = "" #if specified, VM's that do not have performance data will be sized to this size as the fallback size. If you don't specify anything, they will remain at their current size untill performance data for right sizing is available
     #####END OF OPTIONAL CONFIGURATION#########
   
     $cul = $vCPUTrigger + $rightSizingMinimumDifferencePercent
@@ -166,7 +180,7 @@ function get-vmRightSize{
             Write-Verbose "Caching available VM sizes in $region"
             $global:azureAvailableVMSizes = Get-AzVMSize -Location $region -ErrorAction Stop
             Write-Verbose "Cached the following available VM types in $region :"
-            Write-Verbose $global:azureAvailableVMSizes.Name -Join ","
+            Write-Verbose ($global:azureAvailableVMSizes.Name -Join ",")
         }catch{
             Throw "$targetVMName failed to retrieve available Azure VM sizes in region $region because of $_"
         }
@@ -206,6 +220,7 @@ function get-vmRightSize{
     #get meta data of targeted VM
     try{
         $targetVM = Get-AzVM -Name $targetVMName
+        $script:reportRow.currentSize = $targetVM.HardwareProfile.VmSize
         $targetVMPricing = $Null
         $targetVMPricing = $azureVMPrices | where{$_.name -eq $targetVM.HardwareProfile.VmSize}
 
@@ -224,6 +239,7 @@ function get-vmRightSize{
         if($targetVM.Tags["LCRightSizeConfig"] -eq "disabled"){
             Throw "$targetVMName right sizing disabled through Azure Tag"
         }else{
+            $script:reportRow.targetSize = $targetVM.Tags["LCRightSizeConfig"]
             return $targetVM.Tags["LCRightSizeConfig"]
         }
     }
@@ -236,6 +252,11 @@ function get-vmRightSize{
         Write-Verbose "$targetVMName retrieved $($resultsArray.Count) memory datapoints from Azure Monitor"
         #we need to ensure enough datapoints exist
         if($resultsArray.Count -le $measurePeriodHours*4){
+            if($defaultSize){
+                Write-Verbose "Insufficient performance data to right size, default size specified at $defaultSize"
+                $script:reportRow.targetSize = $defaultSize
+                return $defaultSize
+            }
             Throw "too few MEM perf data points to reliably calculate optimal VM size"
         }
         $memoryStats = get-vmCounterStats -Data $resultsArray.CounterValue
@@ -258,6 +279,11 @@ function get-vmRightSize{
         Write-Verbose "$targetVMName retrieved $($resultsArray.Count) cpu datapoints from Azure Monitor"
         #we need to ensure enough datapoints exist
         if($resultsArray.Count -le $measurePeriodHours*4){
+            if($defaultSize){
+                Write-Verbose "Insufficient performance data to right size, default size specified at $defaultSize"
+                $script:reportRow.targetSize = $defaultSize
+                return $defaultSize
+            }
             Throw "too few CPU perf data points to reliably calculate optimal VM size"
         }
         $cpuStats = get-vmCounterStats -Data $resultsArray.CounterValue
@@ -300,6 +326,7 @@ function get-vmRightSize{
     for($i=0;$i -lt $selectedVMTypes.Count;$i++){
         if($selectedVMTypes[$i].NumberOfCores -ge $targetMinimumCPUCount -and $selectedVMTypes[$i].NumberOfCores -le $maxvCPUs -and $selectedVMTypes[$i].MemoryInMB -le $maxMemoryGB*1024 -and $selectedVMTypes[$i].MemoryInMB -ge $targetMinimumMemoryInMB){
             $desiredVMType = $selectedVMTypes[$i]
+            $script:reportRow.targetSize = $desiredVMType.Name
             break
         }
     }
@@ -319,6 +346,7 @@ function get-vmRightSize{
                 }else{
                     Write-Verbose "$targetVMName financial impact: $([Math]::Round($costFactor*100*-1,2))% cost increase"
                 }
+                $script:reportRow.costImpactPercent = $costFactor*-100
             }
             Write-Verbose "$targetVMName should be resized from $($targetVM.HardwareProfile.VmSize) to $($desiredVMType.Name)"
             Write-Verbose "$targetVMName $($desiredVMType.Name) has $($desiredVMType.NumberOfCores) vCPU's and $($desiredVMType.MemoryInMB)MB Memory"
@@ -376,8 +404,72 @@ function get-vmCounterStats{
     Return $Stats
 }
 
+function set-rsgRightSize{
+    <#
+
+    .SYNOPSIS
+
+    Targets all VM's in a given resource group for right sizing.
+    Use -Force to also resize VM's that are running, and -WhatIf with -Verbose to see what would happen without actually resizing
+    Use -Report to output a full report in csv format
+
+    .EXAMPLE
+    set-rsgRightSize -targetRSG rg-avd-we-01 -domain company.local -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -Force
+    set-rsgRightSize -targetRSG rg-avd-we-01 -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -WhatIf
+
+    #>
+    Param(
+        [Parameter(Mandatory)][String]$targetRSG,
+        [Parameter(Mandatory)][Guid]$workspaceId, #workspace GUID where perf data is stored (use Get-AzOperationalInsightsWorkspace to find this)
+        $domain, #if your machines are domain joined, enter the domain name here
+        [Int]$maintenanceWindowStartHour, #start hour of maintenancewindow in military time UTC (0-23)
+        [Int]$maintenanceWindowLengthInHours, #length of maintenance window in hours (round up if needed)
+        [ValidateSet(0,1,2,3,4,5,6)][Int]$maintenanceWindowDay, #day on which the maintenance window starts (UTC) where 0 = Sunday and 6 = Saturday
+        [String]$region = "westeurope", #you can find yours using Get-AzLocation | select Location
+        [Int]$measurePeriodHours = 152, #lookback period for a VM's performance while it was online, this is used to calculate the optimum. It is not recommended to size multiple times in this period!
+        [Switch]$Force, #shuts a VM down to resize it if it detects the VM is still running when you run this command
+        [Switch]$Boot, #after resizing, by default a VM stays offline. Use -Boot to automatically start if after resizing
+        [Switch]$WhatIf, #best used together with -Verbose. Causes the script not to modify anything, just to log what it would do
+        [Switch]$Report
+    )    
+
+    Write-Verbose "Getting VM's for RSG $targetRSG"
+    $targetVMs = Get-AzVM -ResourceGroupName $targetRSG -ErrorAction Stop
+    $reportRows = @()
+    foreach($vm in $targetVMs){
+        Write-Verbose "calling set-vmRightSize for $($vm.Name)"
+        $retVal = set-vmRightSize -targetVMName $vm.Name -domain $domain -workspaceId $workspaceId -maintenanceWindowStartHour $maintenanceWindowStartHour -maintenanceWindowLengthInHours $maintenanceWindowLengthInHours -maintenanceWindowDay $maintenanceWindowDay -region $region -measurePeriodHours $measurePeriodHours -Report:$Report.IsPresent -Force:$Force.IsPresent -Boot:$Boot.IsPresent -WhatIf:$WhatIf.IsPresent
+        if($Report){
+            $reportRows += $retVal
+        }else{
+            $retVal
+        }
+    }
+    if($Report){
+        $reportPath = Join-Path $Env:TEMP -ChildPath "addrs-report.csv" 
+        Write-Output "Writing report with $($reportRows.Count) lines to $reportPath"
+        $reportRows | Export-CSV -Path $reportPath -Force -Encoding UTF8 -NoTypeInformation -Confirm:$False
+        Start-Process $reportPath
+        Write-Output "Report written and launched, script has completed"
+    }
+
+}
+
 function set-vmRightSize{
     [cmdletbinding()]
+    <#
+
+    .SYNOPSIS
+
+    Targets a single VM for right sizing. Use set-rsgRightSize if you wish to resize all VM's in a resource group
+    Use -Force to also resize VM's that are running, and -WhatIf with -Verbose to see what would happen without actually resizing
+    Use -Report to output a report object
+
+    .EXAMPLE
+    set-vmRightSize -targetVMName azvm01 -domain company.local -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -Force
+    set-vmRightSize -targetVMName azvm01 -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -WhatIf
+
+    #>
     Param(
         [Parameter(Mandatory)][String]$targetVMName,
         [Parameter(Mandatory)][Guid]$workspaceId, #workspace GUID where perf data is stored (use Get-AzOperationalInsightsWorkspace to find this)
@@ -389,22 +481,40 @@ function set-vmRightSize{
         [Int]$measurePeriodHours = 152, #lookback period for a VM's performance while it was online, this is used to calculate the optimum. It is not recommended to size multiple times in this period!
         [Switch]$Force, #shuts a VM down to resize it if it detects the VM is still running when you run this command
         [Switch]$Boot, #after resizing, by default a VM stays offline. Use -Boot to automatically start if after resizing
-        [Switch]$WhatIf #best used together with -Verbose. Causes the script not to modify anything, just to log what it would do
+        [Switch]$WhatIf, #best used together with -Verbose. Causes the script not to modify anything, just to log what it would do
+        [Switch]$Report
     )
     try{
         Write-Verbose "$targetVMName getting metadata"
         $vm = Get-AzVM -Name $targetVMName -Status
         Write-Verbose "$targetVMName calculating optimal size"
-        $optimalSize = get-vmRightSize -targetVMName $targetVMName -workspaceId $workspaceId -maintenanceWindowStartHour $maintenanceWindowStartHour -maintenanceWindowLengthInHours $maintenanceWindowLengthInHours -maintenanceWindowDay $maintenanceWindowDay -region $region -measurePeriodHours $measurePeriodHours
+        $optimalSize = get-vmRightSize -targetVMName $targetVMName -workspaceId $workspaceId -maintenanceWindowStartHour $maintenanceWindowStartHour -maintenanceWindowLengthInHours $maintenanceWindowLengthInHours -maintenanceWindowDay $maintenanceWindowDay -region $region -measurePeriodHours $measurePeriodHours -domain $domain
         if($optimalSize -eq $vm.HardwareProfile.VmSize){
             Write-Verbose "$targetVMName already at optimal size"
-            return $False
+            if($Report){
+                return $script:reportRow
+            }else{
+                return $False
+            }
         }else{
             Write-Verbose "$targetVMName resizing from $($vm.HardwareProfile.VmSize) to $optimalSize ..."
-            set-vmToSize -vm $vm -newSize $optimalSize -Force:$Force.IsPresent -Boot:$Boot.IsPresent -WhatIf:$WhatIf.IsPresent
+            $retVal = set-vmToSize -vm $vm -newSize $optimalSize -Force:$Force.IsPresent -Boot:$Boot.IsPresent -WhatIf:$WhatIf.IsPresent
+            if($retVal -eq "OK"){
+                $script:reportRow.resized = $True
+            }
+            if($Report){
+                return $script:reportRow
+            }else{
+                return $retVal
+            }
         }
     }catch{
         Write-Error $_
-        return $False
+        if($Report){
+            $script:reportRow.reason = $_
+            return $script:reportRow
+        }else{
+            return $False
+        }
     }
 }

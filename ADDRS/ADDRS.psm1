@@ -418,6 +418,7 @@ function set-rsgRightSize{
     set-rsgRightSize -targetRSG rg-avd-we-01 -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -WhatIf
 
     #>
+    [cmdletbinding()]
     Param(
         [Parameter(Mandatory)][String]$targetRSG,
         [Parameter(Mandatory)][Guid]$workspaceId, #workspace GUID where perf data is stored (use Get-AzOperationalInsightsWorkspace to find this)
@@ -456,7 +457,6 @@ function set-rsgRightSize{
 }
 
 function set-vmRightSize{
-    [cmdletbinding()]
     <#
 
     .SYNOPSIS
@@ -470,6 +470,7 @@ function set-vmRightSize{
     set-vmRightSize -targetVMName azvm01 -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -WhatIf
 
     #>
+    [cmdletbinding()]
     Param(
         [Parameter(Mandatory)][String]$targetVMName,
         [Parameter(Mandatory)][Guid]$workspaceId, #workspace GUID where perf data is stored (use Get-AzOperationalInsightsWorkspace to find this)

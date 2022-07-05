@@ -39,17 +39,22 @@ function set-vmToSize{
             Write-Verbose "$($vm.Name) is already stopped or deallocated"
         }
         $vm.HardwareProfile.VmSize = $newSize
-        Write-Verbose "Sending resize command"
+        
         if(!$WhatIf){
+            Write-Verbose "Sending resize command"
             $retVal = ($vm | Update-AzVM).StatusCode
+            Write-Verbose "VM resize: $($retVal)"
         }else{
+            Write-Verbose "Not sending resize command because running in -WhatIf"
             $retVal = "OK"
         }
-        Write-Verbose "VM Resized"
+        
         if($Boot){
-            Write-Verbose "Starting $($vm.Name) as -Boot was specified"
             if(!$WhatIf){
+                Write-Verbose "Starting $($vm.Name) as -Boot was specified"
                 Start-AzVM -Name $($vm.Name) -Confirm:$False -NoWait
+            }else{
+                Write-Verbose "-Boot specified, but not booting as -WhatIf was specified"
             }
         }
         return $retVal
@@ -185,6 +190,7 @@ function get-vmRightSize{
             Throw "$targetVMName failed to retrieve available Azure VM sizes in region $region because of $_"
         }
     }
+
     #use a global var to cache data between subsequent calls to list cost and performance data in the selected region
     if(!$global:azureVMPrices){
         try{
@@ -250,6 +256,10 @@ function get-vmRightSize{
         $result = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspaceId -Query $query -ErrorAction Stop
         $resultsArray = [System.Linq.Enumerable]::ToArray($result.Results)
         Write-Verbose "$targetVMName retrieved $($resultsArray.Count) memory datapoints from Azure Monitor"
+        if($resultsArray.Count -le 0){
+            Write-Verbose "No data returned by Log Analytics"
+            Throw "no data returned by Log Analytics. Was the VM turned on the past hours, and has the 'Available Mbytes' counter been turned on, and do you have permissions to query Log Analytics?"
+        }
         #we need to ensure enough datapoints exist
         if($resultsArray.Count -le $measurePeriodHours*4){
             if($defaultSize){
@@ -277,6 +287,10 @@ function get-vmRightSize{
         $result = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspaceId -Query $query -ErrorAction Stop
         $resultsArray = [System.Linq.Enumerable]::ToArray($result.Results)
         Write-Verbose "$targetVMName retrieved $($resultsArray.Count) cpu datapoints from Azure Monitor"
+        if($resultsArray.Count -le 0){
+            Write-Verbose "No data returned by Log Analytics"
+            Throw "no data returned by Log Analytics. Was the VM turned on the past hours, and has the '% Processor Time' counter been turned on, and do you have permissions to query Log Analytics?"
+        }        
         #we need to ensure enough datapoints exist
         if($resultsArray.Count -le $measurePeriodHours*4){
             if($defaultSize){

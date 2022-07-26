@@ -14,16 +14,12 @@ last updated:       09/09/2021
 Copyright/License:  https://www.lieben.nu/liebensraum/commercial-use/ (Commercial (re)use not allowed without prior written consent by the author, otherwise free to use/modify as long as header are kept intact)
 credits:            Salaudeen Rajack for the base script
 
-Before running this script, your account will need to have administrative rights to all sites you wish to audit. This can be assigned (without removing existing permissions) using:
-
-ForEach($Site in $SitesCollections){
-    Set-PnPTenantSite -Url $Site.Url -Owners "youradminlogin"
-}
+Before running this script, your account will need to have administrative rights to all sites you wish to audit. This is assigned and removed automatically, see line 451
 
 #>
 #Requires -modules PnP.PowerShell
 
-$adminURL = "https://YOURTENANTNAME-admin.sharepoint.com"
+$adminURL = "https://YOURTENANT-admin.sharepoint.com"
 $siteIgnoreList = @("https://xxxx.sharepoint.com/sites/xxxx","https://xxxx.sharepoint.com/sites/xxxx") #in case you want to exclude specific sites from the report
 $principalIgnoreList = @("blue@xxxx.onmicrosoft.com","red@xxx.onmicrosoft.com") #in case you want to exclude specific accounts from the report
 $script:ReportFile = "C:\Temp\data.CSV" #report will be generated here
@@ -447,11 +443,13 @@ Function Generate-PnPSitePermissionRpt(){
 Connect-PnPOnline -Url $adminURL -UseWebLogin
    
 #Get All Site collections - Exclude: Seach Center, Mysite Host, App Catalog, Content Type Hub, eDiscovery and Bot Sites
-$SitesCollections = Get-PnPTenantSite | Where -Property Template -NotIn ("SRCHCEN#0", "SPSMSITEHOST#0", "APPCATALOG#0", "POINTPUBLISHINGHUB#0", "EDISC#0", "STS#-1") | Where -Property Url -NotIn $siteIgnoreList
+$SitesCollections = Get-PnPTenantSite -IncludeOneDriveSites | Where -Property Template -NotIn ("SRCHCEN#0", "SPSMSITEHOST#0", "APPCATALOG#0", "POINTPUBLISHINGHUB#0", "EDISC#0", "STS#-1") | Where -Property Url -NotIn $siteIgnoreList
 
 For($s=0; $s -lt $SitesCollections.Count; $s++){
     Write-Progress -Id 1 -PercentComplete ($s / ($SitesCollections.Count) * 100) -Activity "Exporting Permissions from Site '$($SitesCollections[$s].Url)'" -Status "Processing site $s of $($SitesCollections.Count)"
     $SiteConn = Connect-PnPOnline -Url $SitesCollections[$s].Url -UseWebLogin
+    Set-SPOUser -Site $SitesCollections[$s].Url -LoginName $userUPN -IsSiteCollectionAdmin $true
+    Start-Sleep -s 5
     Write-host "Generating Report for Site:"$SitesCollections[$s].Url
     if($SitesCollections[$s].GroupId.Guid -eq "00000000-0000-0000-0000-000000000000"){
         $groupId = $Null
@@ -459,4 +457,14 @@ For($s=0; $s -lt $SitesCollections.Count; $s++){
         $groupId = $SitesCollections[$s].GroupId.Guid
     }
     Generate-PnPSitePermissionRpt -SiteURL $SitesCollections[$s].URL -groupId $groupId
+    
+}
+
+
+For($s=0; $s -lt $SitesCollections.Count; $s++){
+    Remove-SPOUser -Site $SitesCollections[$s].Url -LoginName $userUPN
+}
+
+For($s=0; $s -lt $SitesCollections.Count; $s++){
+    Get-PnPSiteCollectionAdmin | where {$_.LoginName.EndsWith($userUPN)} | Remove-PnPSiteCollectionAdmin
 }

@@ -252,7 +252,7 @@ function get-vmRightSize{
 
     #get memory performance of targeted VM in configured period
     try{
-        $query = "Perf | where TimeGenerated between (ago($($measurePeriodHours)h) .. ago(0h)) and CounterName == 'Available Mbytes' and Computer == '$($targetVMName)$($domain)'$queryAddition | project TimeGenerated, CounterValue | order by CounterValue"
+        $query = "Perf | where TimeGenerated between (ago($($measurePeriodHours)h) .. ago(0h)) and CounterName =~ 'Available Mbytes' and Computer =~ '$($targetVMName)$($domain)'$queryAddition | project TimeGenerated, CounterValue | order by CounterValue"
         $result = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspaceId -Query $query -ErrorAction Stop
         $resultsArray = [System.Linq.Enumerable]::ToArray($result.Results)
         Write-Verbose "$targetVMName retrieved $($resultsArray.Count) memory datapoints from Azure Monitor"
@@ -283,7 +283,7 @@ function get-vmRightSize{
 
     #get cpu performance of targeted VM in configured period
     try{
-        $query = "Perf | where TimeGenerated between (ago($($measurePeriodHours)h) .. ago(0h)) and CounterName == '% Processor Time' and Computer == '$($targetVMName)$($domain)'$queryAddition | project TimeGenerated, CounterValue | order by CounterValue"
+        $query = "Perf | where TimeGenerated between (ago($($measurePeriodHours)h) .. ago(0h)) and CounterName =~ '% Processor Time' and Computer =~ '$($targetVMName)$($domain)'$queryAddition | project TimeGenerated, CounterValue | order by CounterValue"
         $result = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspaceId -Query $query -ErrorAction Stop
         $resultsArray = [System.Linq.Enumerable]::ToArray($result.Results)
         Write-Verbose "$targetVMName retrieved $($resultsArray.Count) cpu datapoints from Azure Monitor"

@@ -252,13 +252,21 @@ function get-vmRightSize{
 
     #get memory performance of targeted VM in configured period
     try{
-        $query = "Perf | where TimeGenerated between (ago($($measurePeriodHours)h) .. ago(0h)) and (CounterName =~ 'Available Mbytes' or CounterName =~ 'Available Bytes') and Computer =~ '$($targetVMName)$($domain)'$queryAddition | project TimeGenerated, CounterValue | order by CounterValue"
+        $query = "Perf | where TimeGenerated between (ago($($measurePeriodHours)h) .. ago(0h)) and CounterName =~ 'Available Mbytes' and Computer =~ '$($targetVMName)$($domain)'$queryAddition | project TimeGenerated, CounterValue | order by CounterValue"
         $result = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspaceId -Query $query -ErrorAction Stop
         $resultsArray = [System.Linq.Enumerable]::ToArray($result.Results)
-        Write-Verbose "$targetVMName retrieved $($resultsArray.Count) memory datapoints from Azure Monitor"
+        Write-Verbose "$targetVMName retrieved $($resultsArray.Count) MB (LA type counter) memory datapoints from Azure Monitor"
         if($resultsArray.Count -le 0){
-            Write-Verbose "No data returned by Log Analytics"
-            Throw "no data returned by Log Analytics. Was the VM turned on the past hours, and has the 'Available Mbytes' counter been turned on, and do you have permissions to query Log Analytics?"
+            Write-Verbose "No data returned by Log Analytics for LA type counter, checking for AM type counter"
+            $query = "Perf | where TimeGenerated between (ago($($measurePeriodHours)h) .. ago(0h)) and CounterName =~ 'Available Bytes' and Computer =~ '$($targetVMName)$($domain)'$queryAddition | project TimeGenerated, CounterValue | order by CounterValue"
+            $result = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspaceId -Query $query -ErrorAction Stop
+            $resultsArray = [System.Linq.Enumerable]::ToArray($result.Results)   
+            if($resultsArray.Count -le 0){
+                Write-Verbose "No data returned by Log Analytics for AM type counter"
+                Throw "no data returned by Log Analytics. Was the VM turned on the past hours, and has the 'Available Mbytes' or 'Available Bytes' counter been turned on, and do you have permissions to query Log Analytics?"
+            }else{
+                $resultsArray | % {[PSCustomObject]@{"TimeGenerated" = $_.TimeGenerated;"CounterValue"=$_.CounterValue/1MB}}
+            }            
         }
         #we need to ensure enough datapoints exist
         if($resultsArray.Count -le $measurePeriodHours*4){

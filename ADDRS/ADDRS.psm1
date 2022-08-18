@@ -43,9 +43,9 @@ function set-vmToSize{
         if(!$WhatIf){
             Write-Verbose "Sending resize command"
             $retVal = ($vm | Update-AzVM).StatusCode
-            Write-Verbose "VM resize: $($retVal)"
+            Write-Host "VM resize result: $($retVal)"
         }else{
-            Write-Verbose "Not sending resize command because running in -WhatIf"
+            Write-Host "Not sending resize command because running in -WhatIf"
             $retVal = "OK"
         }
         
@@ -182,8 +182,9 @@ function get-vmRightSize{
     #use a global var to cache data between subsequent calls to list all available Azure VM sizes in the region
     if(!$global:azureAvailableVMSizes){
         try{
-            Write-Verbose "Caching available VM sizes in $region"
+            Write-Host "No VM size cache for $region yet, creating this first...."
             $global:azureAvailableVMSizes = Get-AzVMSize -Location $region -ErrorAction Stop
+            Write-Host "VM Size cache created"
             Write-Verbose "Cached the following available VM types in $region :"
             Write-Verbose ($global:azureAvailableVMSizes.Name -Join ",")
         }catch{
@@ -194,8 +195,9 @@ function get-vmRightSize{
     #use a global var to cache data between subsequent calls to list cost and performance data in the selected region
     if(!$global:azureVMPrices){
         try{
-            Write-Verbose "Caching azure vm performance and pricing data"
+            Write-Host "No cache of VM performance and pricing data yet, creating this first...."
             get-azureVMPricesAndPerformance -region $region
+            Write-Host "VM Performance and pricing data cached"
         }catch{
             Throw "$targetVMName failed to get pricing and performance data for Azure VM sizes because of $_"
         }
@@ -253,12 +255,14 @@ function get-vmRightSize{
     #get memory performance of targeted VM in configured period
     try{
         $query = "Perf | where TimeGenerated between (ago($($measurePeriodHours)h) .. ago(0h)) and CounterName =~ 'Available Mbytes' and Computer =~ '$($targetVMName)$($domain)'$queryAddition | project TimeGenerated, CounterValue | order by CounterValue"
+        Write-Verbose "$targetVMName querying log analytics: $query"
         $result = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspaceId -Query $query -ErrorAction Stop
         $resultsArray = [System.Linq.Enumerable]::ToArray($result.Results)
         Write-Verbose "$targetVMName retrieved $($resultsArray.Count) MB (LA type counter) memory datapoints from Azure Monitor"
         if($resultsArray.Count -le 0){
             Write-Verbose "No data returned by Log Analytics for LA type counter, checking for AM type counter"
             $query = "Perf | where TimeGenerated between (ago($($measurePeriodHours)h) .. ago(0h)) and CounterName =~ 'Available Bytes' and Computer =~ '$($targetVMName)$($domain)'$queryAddition | project TimeGenerated, CounterValue | order by CounterValue"
+            Write-Verbose "$targetVMName querying azure monitor: $query"
             $result = Invoke-AzOperationalInsightsQuery -WorkspaceId $workspaceId -Query $query -ErrorAction Stop
             $resultsArray = [System.Linq.Enumerable]::ToArray($result.Results)   
             if($resultsArray.Count -le 0){
@@ -394,17 +398,17 @@ function get-vmCounterStats{
         $MedianIndex = [math]::Ceiling(($Data.Count - 1) / 2)
         $Median = $Data[$MedianIndex]
     }
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Median' -Value $Median
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Median' -Value $Median -Force
        
     $Variance = 0
     foreach ($_ in $Data) {
         $Variance += [math]::Pow($_ - $Stats.Average, 2) / $Stats.Count
     }
     $Variance /= $Stats.Count
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Variance' -Value $Variance
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Variance' -Value $Variance -Force
 
     $StandardDeviation = [math]::Sqrt($Stats.Variance)
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'StandardDeviation' -Value $StandardDeviation
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'StandardDeviation' -Value $StandardDeviation -Force
       
     $Percentile1Index = [math]::Ceiling(1 / 100 * $Data.Count)
     $Percentile5Index = [math]::Ceiling(5 / 100 * $Data.Count)
@@ -414,14 +418,14 @@ function get-vmCounterStats{
     $Percentile90Index = [math]::Ceiling(90 / 100 * $Data.Count)
     $Percentile95Index = [math]::Ceiling(95 / 100 * $Data.Count)
     $Percentile99Index = [math]::Ceiling(99 / 100 * $Data.Count)
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile1' -Value $Data[$Percentile1Index]
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile5' -Value $Data[$Percentile5Index]
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile10' -Value $Data[$Percentile10Index]
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile25' -Value $Data[$Percentile25Index]
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile75' -Value $Data[$Percentile75Index]
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile90' -Value $Data[$Percentile90Index]
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile95' -Value $Data[$Percentile95Index]
-    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile99' -Value $Data[$Percentile99Index]
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile1' -Value $Data[$Percentile1Index] -Force
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile5' -Value $Data[$Percentile5Index] -Force
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile10' -Value $Data[$Percentile10Index] -Force
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile25' -Value $Data[$Percentile25Index] -Force
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile75' -Value $Data[$Percentile75Index] -Force
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile90' -Value $Data[$Percentile90Index] -Force
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile95' -Value $Data[$Percentile95Index] -Force
+    Add-Member -InputObject $Stats -MemberType NoteProperty -Name 'Percentile99' -Value $Data[$Percentile99Index] -Force
 
     Return $Stats
 }
@@ -513,14 +517,14 @@ function set-vmRightSize{
         Write-Verbose "$targetVMName calculating optimal size"
         $optimalSize = get-vmRightSize -targetVMName $targetVMName -workspaceId $workspaceId -maintenanceWindowStartHour $maintenanceWindowStartHour -maintenanceWindowLengthInHours $maintenanceWindowLengthInHours -maintenanceWindowDay $maintenanceWindowDay -region $region -measurePeriodHours $measurePeriodHours -domain $domain
         if($optimalSize -eq $vm.HardwareProfile.VmSize){
-            Write-Verbose "$targetVMName already at optimal size"
+            Write-Host "$targetVMName already at optimal size"
             if($Report){
                 return $script:reportRow
             }else{
                 return $False
             }
         }else{
-            Write-Verbose "$targetVMName resizing from $($vm.HardwareProfile.VmSize) to $optimalSize ..."
+            Write-Host "$targetVMName resizing from $($vm.HardwareProfile.VmSize) to $optimalSize ..."
             $retVal = set-vmToSize -vm $vm -newSize $optimalSize -Force:$Force.IsPresent -Boot:$Boot.IsPresent -WhatIf:$WhatIf.IsPresent
             if($retVal -eq "OK"){
                 $script:reportRow.resized = $True

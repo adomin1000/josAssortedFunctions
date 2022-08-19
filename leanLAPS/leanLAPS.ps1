@@ -18,6 +18,7 @@
 $minimumPasswordLength = 21
 $publicEncryptionKey = "" #if you supply a public encryption key, leanLaps will use this to encrypt the password, ensuring it will only be in encrypted form in Proactive Remediations
 $localAdminName = 'LCAdmin'
+$autoEnableLocalAdmin = $False #if for some reason the admin account this script creates becomes disabled, leanLAPS will re-enable it
 $removeOtherLocalAdmins = $False #if set to True, will remove ALL other local admins, including those set through AzureAD device settings
 $disableBuiltinAdminAccount = $False #Disables the built in admin account (which cannot be removed). Usually not needed as most OOBE setups have already done this
 $doNotRunOnServers = $True #buildin protection in case an admin accidentally assigns this script to e.g. a domain controller
@@ -120,6 +121,14 @@ try{
         Write-CustomEventLog "$localAdminName is not a local administrator, adding..."
         $res = Add-LocalGroupMember -Group $administratorsGroupName -Member $localAdminName -Confirm:$False -ErrorAction Stop
         Write-CustomEventLog "Added $localAdminName to the local administrators group"
+    }
+
+    #Enable leanLAPS account if it is disabled
+    if($autoEnableLocalAdmin){
+        if(!(Get-LocalUser -SID $localAdmin.SID.Value).Enabled){
+            $res = Enable-LocalUser -SID $localAdmin.SID.Value -Confirm:$False
+            Write-CustomEventLog "Enabled $($localAdminName) because it was disabled and `$autoEnableLocalAdmin is set to `$True"
+        }
     }
 
     #disable built in admin account if specified

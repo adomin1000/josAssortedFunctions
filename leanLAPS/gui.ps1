@@ -37,6 +37,10 @@ function getDeviceInfo {
             $deviceStatus = $Null
             $deviceStatuses = (Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value
             foreach($device in $deviceStatuses){
+                if($device.managedDevice.deviceName -ne $inputBox.text){
+                    Write-Host "Filtering out result $($device.managedDevice.deviceName) because it does not match $($inputBox.text)"
+                    continue
+                }
                 if($deviceStatus){
                     try{
                         if([DateTime]($device.postRemediationDetectionScriptOutput -Replace(".* changed on ","")) -gt [DateTime]($deviceStatus.postRemediationDetectionScriptOutput -Replace(".* changed on ",""))){

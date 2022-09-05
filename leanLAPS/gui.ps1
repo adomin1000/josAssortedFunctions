@@ -30,12 +30,12 @@ function getDeviceInfo {
         
             #Connect to GraphAPI and get leanLAPS for a specific device that was supplied through the GUI
             $graphApiVersion = "beta"
-			$deviceInfoURL = [uri]::EscapeUriString("https://graph.microsoft.com/$graphApiVersion/deviceManagement/deviceHealthScripts/$remediationScriptID/deviceRunStates?`$select=postRemediationDetectionScriptOutput&`$filter=managedDevice/deviceName eq '" + $inputBox.text + "'&`$expand=managedDevice(`$select=deviceName,operatingSystem,osVersion,emailAddress)")
+			$deviceInfoURL = [uri]::EscapeUriString("https://graph.microsoft.com/$graphApiVersion/deviceManagement/deviceHealthScripts/$remediationScriptID/deviceRunStates?`$select=postRemediationDetectionScriptOutput&`$expand=managedDevice(`$select=deviceName,operatingSystem,osVersion,emailAddress)&`$filter=managedDevice/deviceName eq '" + $inputBox.text + "'")
 
             #Get information needed from MSGraph call about the Proactive Remediation Device Status
             $device = $Null
             $deviceStatus = $Null
-            $deviceStatuses = (Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get).value
+            $deviceStatuses = (Invoke-MSGraphRequest -Url $deviceInfoURL -HttpMethod Get) | Get-MSGraphAllPages
             foreach($device in $deviceStatuses){
                 if($device.managedDevice.deviceName -ne $inputBox.text){
                     Write-Host "Filtering out result $($device.managedDevice.deviceName) because it does not match $($inputBox.text)"

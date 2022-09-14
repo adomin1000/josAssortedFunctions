@@ -130,7 +130,8 @@ function get-vmRightSize{
         [Int]$maintenanceWindowLengthInHours, #length of maintenance window in hours (round up if needed)
         [ValidateSet(0,1,2,3,4,5,6)][Int]$maintenanceWindowDay, #day on which the maintenance window starts (UTC) where 0 = Sunday and 6 = Saturday
         [String]$region = "westeurope", #you can find yours using Get-AzLocation | select Location
-        [Int]$measurePeriodHours = 152 #lookback period for a VM's performance while it was online, this is used to calculate the optimum. It is not recommended to size multiple times in this period!
+        [Int]$measurePeriodHours = 152, #lookback period for a VM's performance while it was online, this is used to calculate the optimum. It is not recommended to size multiple times in this period!
+        [Array]$allowedVMTypes = @("Standard_D2ds_v4","Standard_D4ds_v4","Standard_D8ds_v4","Standard_D2ds_v5","Standard_D4ds_v5","Standard_D8ds_v5","Standard_E2ds_v4","Standard_E4ds_v4","Standard_E8ds_v4","Standard_E2ds_v5","Standard_E4ds_v5","Standard_E8ds_v5")
     )
     
     $script:reportRow = [PSCustomObject]@{
@@ -150,9 +151,6 @@ function get-vmRightSize{
     $maxMemoryGB = 32 #will never assign more than this (even if you've allowed VM's with more)
     $minvCPUs = 2 #min 2 required for network acceleration!
     $maxvCPUs = 12 #in no case will this function assign a vmtype with more vCPU's than this
-    #the following is a 'allowedList' of VM types to prevent the function from selecting undesired VM types
-    #this function will select the optimum VM that meets CPU/MEM requirements based first on cost, then performance, then version (if known)
-    $allowedVMTypes = @("Standard_D2ds_v4","Standard_D4ds_v4","Standard_D8ds_v4","Standard_D2ds_v5","Standard_D4ds_v5","Standard_D8ds_v5","Standard_E2ds_v4","Standard_E4ds_v4","Standard_E8ds_v4","Standard_E2ds_v5","Standard_E4ds_v5","Standard_E8ds_v5")
     $defaultSize = "" #if specified, VM's that do not have performance data will be sized to this size as the fallback size. If you don't specify anything, they will remain at their current size untill performance data for right sizing is available
     #####END OF OPTIONAL CONFIGURATION#########
   
@@ -224,6 +222,11 @@ function get-vmRightSize{
 
     #sort the VM types we may use based on their price first, then performance rating
     $selectedVMTypes = $selectedVMTypes | Sort-Object @{e={$_.windowsPrice};a=1},@{e={$_.perf}; a=0},@{e={$_.Name.Split("_")[-1]}; a=0}
+
+    #error out if none match
+    if($selectedVMTypes.Count -le 0){
+        Throw "$targetVMName failed to determine optimal size because your `$allowedVMTypes list does not contain any VM's that are available in this subscription and region"
+    }
 
     #get meta data of targeted VM
     try{
@@ -378,6 +381,8 @@ function get-vmRightSize{
             Write-Verbose "$targetVMName $($desiredVMType.Name) has $($desiredVMType.NumberOfCores) vCPU's and $($desiredVMType.MemoryInMB)MB Memory"
             return $desiredVMType.Name
         }
+    }else{
+        Throw "$targetVMName failed to find a VM with at least $($desiredVMType.NumberOfCores) vCPU's and $($desiredVMType.MemoryInMB)MB Memory in your `$allowedVMTypes list"
     }
 }
 
@@ -442,6 +447,7 @@ function set-rsgRightSize{
     .EXAMPLE
     set-rsgRightSize -targetRSG rg-avd-we-01 -domain company.local -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -Force
     set-rsgRightSize -targetRSG rg-avd-we-01 -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -WhatIf
+    set-rsgRightSize -targetRSG rg-avd-we-01 -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -allowedVMTypes @("Standard_D2ds_v4","Standard_D4ds_v4","Standard_D8ds_v4")
 
     #>
     [cmdletbinding()]
@@ -457,7 +463,8 @@ function set-rsgRightSize{
         [Switch]$Force, #shuts a VM down to resize it if it detects the VM is still running when you run this command
         [Switch]$Boot, #after resizing, by default a VM stays offline. Use -Boot to automatically start if after resizing
         [Switch]$WhatIf, #best used together with -Verbose. Causes the script not to modify anything, just to log what it would do
-        [Switch]$Report
+        [Switch]$Report,
+        [Array]$allowedVMTypes = @("Standard_D2ds_v4","Standard_D4ds_v4","Standard_D8ds_v4","Standard_D2ds_v5","Standard_D4ds_v5","Standard_D8ds_v5","Standard_E2ds_v4","Standard_E4ds_v4","Standard_E8ds_v4","Standard_E2ds_v5","Standard_E4ds_v5","Standard_E8ds_v5")
     )    
 
     Write-Verbose "Getting VM's for RSG $targetRSG"
@@ -465,7 +472,7 @@ function set-rsgRightSize{
     $reportRows = @()
     foreach($vm in $targetVMs){
         Write-Verbose "calling set-vmRightSize for $($vm.Name)"
-        $retVal = set-vmRightSize -targetVMName $vm.Name -domain $domain -workspaceId $workspaceId -maintenanceWindowStartHour $maintenanceWindowStartHour -maintenanceWindowLengthInHours $maintenanceWindowLengthInHours -maintenanceWindowDay $maintenanceWindowDay -region $region -measurePeriodHours $measurePeriodHours -Report:$Report.IsPresent -Force:$Force.IsPresent -Boot:$Boot.IsPresent -WhatIf:$WhatIf.IsPresent
+        $retVal = set-vmRightSize -allowedVMTypes $allowedVMTypes -targetVMName $vm.Name -domain $domain -workspaceId $workspaceId -maintenanceWindowStartHour $maintenanceWindowStartHour -maintenanceWindowLengthInHours $maintenanceWindowLengthInHours -maintenanceWindowDay $maintenanceWindowDay -region $region -measurePeriodHours $measurePeriodHours -Report:$Report.IsPresent -Force:$Force.IsPresent -Boot:$Boot.IsPresent -WhatIf:$WhatIf.IsPresent
         if($Report){
             $reportRows += $retVal
         }else{
@@ -494,6 +501,7 @@ function set-vmRightSize{
     .EXAMPLE
     set-vmRightSize -targetVMName azvm01 -domain company.local -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -Force
     set-vmRightSize -targetVMName azvm01 -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -WhatIf
+    set-vmRightSize -targetVMName azvm01 -workspaceId e32b3dbe-2850-4f88-9acb-2b919cce4126 -allowedVMTypes @("Standard_D2ds_v4","Standard_D4ds_v4","Standard_D8ds_v4")
 
     #>
     [cmdletbinding()]
@@ -509,13 +517,14 @@ function set-vmRightSize{
         [Switch]$Force, #shuts a VM down to resize it if it detects the VM is still running when you run this command
         [Switch]$Boot, #after resizing, by default a VM stays offline. Use -Boot to automatically start if after resizing
         [Switch]$WhatIf, #best used together with -Verbose. Causes the script not to modify anything, just to log what it would do
-        [Switch]$Report
+        [Switch]$Report,
+        [Array]$allowedVMTypes = @("Standard_D2ds_v4","Standard_D4ds_v4","Standard_D8ds_v4","Standard_D2ds_v5","Standard_D4ds_v5","Standard_D8ds_v5","Standard_E2ds_v4","Standard_E4ds_v4","Standard_E8ds_v4","Standard_E2ds_v5","Standard_E4ds_v5","Standard_E8ds_v5")
     )
     try{
         Write-Verbose "$targetVMName getting metadata"
         $vm = Get-AzVM -Name $targetVMName -Status
         Write-Verbose "$targetVMName calculating optimal size"
-        $optimalSize = get-vmRightSize -targetVMName $targetVMName -workspaceId $workspaceId -maintenanceWindowStartHour $maintenanceWindowStartHour -maintenanceWindowLengthInHours $maintenanceWindowLengthInHours -maintenanceWindowDay $maintenanceWindowDay -region $region -measurePeriodHours $measurePeriodHours -domain $domain
+        $optimalSize = get-vmRightSize -allowedVMTypes $allowedVMTypes -targetVMName $targetVMName -workspaceId $workspaceId -maintenanceWindowStartHour $maintenanceWindowStartHour -maintenanceWindowLengthInHours $maintenanceWindowLengthInHours -maintenanceWindowDay $maintenanceWindowDay -region $region -measurePeriodHours $measurePeriodHours -domain $domain
         if($optimalSize -eq $vm.HardwareProfile.VmSize){
             Write-Host "$targetVMName already at optimal size"
             if($Report){

@@ -52,37 +52,42 @@ function getDeviceInfo {
                 }
             }
 
-            $LocalAdminUsername = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for " -replace ", last changed on.*"
-            $deviceName = $deviceStatus.managedDevice.deviceName
-            $userSignedIn = $deviceStatus.managedDevice.emailAddress
-            $deviceOS = $deviceStatus.managedDevice.operatingSystem
-            $deviceOSVersion = $deviceStatus.managedDevice.osVersion
-            $laps = $deviceStatus.postRemediationDetectionScriptOutput -replace ".*LeanLAPS current password: " -replace " for $LocalAdminUsername, last changed on.*"
-			$lastChanged = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for $LocalAdminUsername, last changed on "
+            if($deviceStatus){
+
+                $LocalAdminUsername = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for " -replace ", last changed on.*"
+                $deviceName = $deviceStatus.managedDevice.deviceName
+                $userSignedIn = $deviceStatus.managedDevice.emailAddress
+                $deviceOS = $deviceStatus.managedDevice.operatingSystem
+                $deviceOSVersion = $deviceStatus.managedDevice.osVersion
+                $laps = $deviceStatus.postRemediationDetectionScriptOutput -replace ".*LeanLAPS current password: " -replace " for $LocalAdminUsername, last changed on.*"
+			    $lastChanged = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for $LocalAdminUsername, last changed on "
         
-            # Adding properties to object
-            $deviceInfoDisplay = New-Object PSCustomObject
+                # Adding properties to object
+                $deviceInfoDisplay = New-Object PSCustomObject
         
-            # Add collected properties to object
-            $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Local Username" -Value (".\" + $LocalAdminUsername)
-            if($privateKey.Length -lt 5){
-                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value $laps
+                # Add collected properties to object
+                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Local Username" -Value (".\" + $LocalAdminUsername)
+                if($privateKey.Length -lt 5){
+                    $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value $laps
+                }else{
+                    $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
+                    $rsa.ImportCspBlob([byte[]]($privateKey -split ","))
+                    $decrypted = $rsa.Decrypt([byte[]]($laps -split " "), $false)
+                    $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value ([System.Text.Encoding]::UTF8.GetString($decrypted))
+                }
+			    $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password Changed" -Value $lastChanged
+                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device Name" -Value $deviceName
+                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "User" -Value $userSignedIn
+                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device OS" -Value $deviceOS
+                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "OS Version" -Value $deviceOSVersion
+        
+                If($deviceInfoDisplay.Password) {
+                    $outputBox.text = ($deviceInfoDisplay | Out-String).Trim()
+                } Else {
+                    $outputBox.text="Failed to gather information. Please check the device name."
+                }
             }else{
-                $rsa = New-Object System.Security.Cryptography.RSACryptoServiceProvider
-                $rsa.ImportCspBlob([byte[]]($privateKey -split ","))
-                $decrypted = $rsa.Decrypt([byte[]]($laps -split " "), $false)
-                $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password" -Value ([System.Text.Encoding]::UTF8.GetString($decrypted))
-            }
-			$deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Password Changed" -Value $lastChanged
-            $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device Name" -Value $deviceName
-            $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "User" -Value $userSignedIn
-            $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Device OS" -Value $deviceOS
-            $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "OS Version" -Value $deviceOSVersion
-        
-            If($deviceInfoDisplay.Password) {
-                $outputBox.text = ($deviceInfoDisplay | Out-String).Trim()
-            } Else {
-                $outputBox.text="Failed to gather information. Please check the device name."
+                $outputBox.text = "Device name not found or remediation did not yet run"
             }
         } Else {
             $outputBox.text="Device name has not been provided. Please type a device name and then click `"Device Info`""

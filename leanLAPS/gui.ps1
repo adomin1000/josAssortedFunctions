@@ -52,7 +52,7 @@ function getDeviceInfo {
                 }
             }
 
-            if($deviceStatus){
+            if($deviceStatus.postRemediationDetectionScriptOutput){
 
                 $LocalAdminUsername = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for " -replace ", last changed on.*"
                 $deviceName = $deviceStatus.managedDevice.deviceName

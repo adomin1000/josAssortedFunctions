@@ -41,7 +41,7 @@ function getDeviceInfo {
                     Write-Host "Filtering out result $($device.managedDevice.deviceName) because it does not match $($inputBox.text)"
                     continue
                 }
-                if($deviceStatus){
+                if($deviceStatus.postRemediationDetectionScriptOutput){
                     try{
                         if([DateTime]($device.postRemediationDetectionScriptOutput -Replace(".* changed on ","")) -gt [DateTime]($deviceStatus.postRemediationDetectionScriptOutput -Replace(".* changed on ",""))){
                             $deviceStatus = $device
@@ -53,7 +53,6 @@ function getDeviceInfo {
             }
 
             if($deviceStatus.postRemediationDetectionScriptOutput){
-
                 $LocalAdminUsername = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for " -replace ", last changed on.*"
                 $deviceName = $deviceStatus.managedDevice.deviceName
                 $userSignedIn = $deviceStatus.managedDevice.emailAddress

@@ -43,7 +43,7 @@ function getDeviceInfo {
                 }
                 if($deviceStatus.postRemediationDetectionScriptOutput){
                     try{
-                        if([DateTime]($device.postRemediationDetectionScriptOutput -Replace(".* changed on ","")) -gt [DateTime]($deviceStatus.postRemediationDetectionScriptOutput -Replace(".* changed on ",""))){
+                        if((($device.postRemediationDetectionScriptOutput) | ConvertFrom-Json).Date.value -gt (($deviceStatus.postRemediationDetectionScriptOutput) | ConvertFrom-Json).Date.value){
                             $deviceStatus = $device
                         }
                     }catch{$Null}
@@ -53,13 +53,14 @@ function getDeviceInfo {
             }
 
             if($deviceStatus.postRemediationDetectionScriptOutput){
-                $LocalAdminUsername = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for " -replace ", last changed on.*"
+                $postRemediationDetectionScriptOutput = $deviceStatus.postRemediationDetectionScriptOutput | ConvertFrom-Json
+                $LocalAdminUsername = $postRemediationDetectionScriptOutput.Username
                 $deviceName = $deviceStatus.managedDevice.deviceName
                 $userSignedIn = $deviceStatus.managedDevice.emailAddress
                 $deviceOS = $deviceStatus.managedDevice.operatingSystem
                 $deviceOSVersion = $deviceStatus.managedDevice.osVersion
-                $laps = $deviceStatus.postRemediationDetectionScriptOutput -replace ".*LeanLAPS current password: " -replace " for $LocalAdminUsername, last changed on.*"
-			    $lastChanged = $deviceStatus.postRemediationDetectionScriptOutput -replace ".* for $LocalAdminUsername, last changed on "
+                $laps = $postRemediationDetectionScriptOutput.SecurePassword
+			    $lastChanged = $postRemediationDetectionScriptOutput.Date.value
         
                 # Adding properties to object
                 $deviceInfoDisplay = New-Object PSCustomObject

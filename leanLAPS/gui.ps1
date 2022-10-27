@@ -65,6 +65,14 @@ function getDeviceInfo {
                 # Adding properties to object
                 $deviceInfoDisplay = New-Object PSCustomObject
         
+                #Unescape escaped characters as Windows PowerShell's implementation does for <>'&
+                $laps = [regex]::replace(
+                  $laps, 
+                  '(?<=(?:^|[^\\])(?:\\\\)*)\\u(00(?:26|27|3c|3e))', 
+                  { param($match) [char] [int] ('0x' + $match.Groups[1].Value) },
+                  'IgnoreCase'
+                )
+
                 # Add collected properties to object
                 $deviceInfoDisplay | Add-Member -MemberType NoteProperty -Name "Local Username" -Value (".\" + $LocalAdminUsername)
                 if($privateKey.Length -lt 5){

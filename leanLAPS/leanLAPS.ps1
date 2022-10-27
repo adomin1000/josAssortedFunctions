@@ -41,7 +41,7 @@ function Get-NewPassword($passwordLength){ #minimum 10 characters will always be
     $password = Get-RandomCharacters -length ([Math]::Max($passwordLength-6,4)) -characters 'abcdefghiklmnoprstuvwxyz'
     $password += Get-RandomCharacters -length 2 -characters 'ABCDEFGHKLMNOPRSTUVWXYZ'
     $password += Get-RandomCharacters -length 2 -characters '1234567890'
-    $password += Get-RandomCharacters -length 2 -characters '!_%&/()=?}][{#*+'
+    $password += Get-RandomCharacters -length 2 -characters '!_%/()=?}][{#*+' #it is not recommended to use the following symbols in your password: '<>&
     $characterArray = $password.ToCharArray()   
     $scrambledStringArray = $characterArray | Get-Random -Count $characterArray.Length     
     $outputString = -join $scrambledStringArray

@@ -223,6 +223,8 @@ function get-vmRightSize{
     #sort the VM types we may use based on their price first, then performance rating
     $selectedVMTypes = $selectedVMTypes | Sort-Object @{e={$_.windowsPrice};a=1},@{e={$_.perf}; a=0},@{e={$_.Name.Split("_")[-1]}; a=0}
 
+    Write-Verbose "Allowed VM types: $($selectedVMTypes.Name -Join ",")"
+
     #error out if none match
     if($selectedVMTypes.Count -le 0){
         Throw "$targetVMName failed to determine optimal size because your `$allowedVMTypes list does not contain any VM's that are available in this subscription and region"

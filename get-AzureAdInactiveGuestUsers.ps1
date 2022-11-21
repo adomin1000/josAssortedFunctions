@@ -6,6 +6,8 @@
     If the nonInteractive switch is supplied, the script will leverage Managed Identity (e.g. when running as an Azure Runbook) to log in to the Graph API. 
     In that case, assign User.ReadWrite.All (when using 'removeInactiveGuests'), AuditLog.Read.All and Organization.Read.All permissions to the managed identity by using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
 
+    If you want the script to send mail reports, also assign a value for the From, To addresses and assign the Mail.Send graph permission to the managed identity as per above instructions.
+
     .NOTES
     filename:   get-AzureAdInactiveGuestUsers.ps1
     author:     Jos Lieben / jos@lieben.nu
@@ -19,7 +21,9 @@
 Param(
     [Int]$inactiveThresholdInDays = 90,
     [Switch]$removeInactiveGuests,
-    [Switch]$nonInteractive
+    [Switch]$nonInteractive,
+    [String]$mailFrom, #this should not be a shared mailbox
+    [String[]]$mailTo
 )
 
 [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Web")
@@ -117,7 +121,46 @@ for($i=0; $i -lt $guests.Count; $i++){
     $reportData+=$obj
 }
 
+$reportData | Export-CSV -Path "guestActivityReport.csv" -Encoding UTF8 -NoTypeInformation
+
 if(!$nonInteractive){
-    $reportData | Export-CSV -Path "guestActivityReport.csv" -Encoding UTF8 -NoTypeInformation
     .\guestActivityReport.csv
+}
+
+If($mailFrom -and $mailTo){
+    $body = @{
+        "message"=@{
+            "subject" = "guest activity report"
+            "body" = @{
+                "contentType" = "HTML"
+                "content" = [String]"please find attached an automated guest activity report"
+            }
+            "toRecipients" = @()
+            "from" = [PSCustomObject]@{
+                "emailAddress"= [PSCustomObject]@{
+                    "address"= $mailFrom
+                }
+            }
+            "attachments" = @()
+        };
+        "saveToSentItems"=$False
+    }
+
+    foreach($recipient in $mailTo){
+        $body.message.toRecipients += [PSCustomObject]@{"emailAddress" = [PSCustomObject]@{"address"=$recipient}} 
+    }
+
+    $attachment = Get-Item "guestActivityReport.csv"
+
+    $FileName=(Get-Item -Path $attachment).name
+    $base64string = [Convert]::ToBase64String([IO.File]::ReadAllBytes($attachment))
+    $body.message.attachments += [PSCustomObject]@{
+        "@odata.type" = "#microsoft.graph.fileAttachment"
+        "name" = "guestActivityReport.csv"
+        "contentType" = "text/plain"
+        "contentBytes" = "$base64string"
+    }
+
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$mailFrom/sendMail" -Method POST -Headers @{"Authorization"="Bearer $token"} -Body ($body | convertto-json -depth 10) -ContentType "application/json"
+
 }

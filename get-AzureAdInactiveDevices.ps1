@@ -29,7 +29,7 @@ Param(
     [Switch]$firstDisableDevices,
     [Int]$disableDurationInDays = 30,
     [Switch]$nonInteractive,
-    [String]$mailFrom,
+    [String]$mailFrom, #this should not be a shared mailbox
     [String[]]$mailTo
 )
 

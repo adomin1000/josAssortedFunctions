@@ -206,6 +206,6 @@ If($mailFrom -and $mailTo){
         "contentBytes" = "$base64string"
     }
 
-    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$mailFrom/sendMail" -Method POST -Headers $graphHeaders -Body ($body | convertto-json -depth 10) -ContentType "application/json"
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$mailFrom/sendMail" -Method POST -Headers @{"Authorization"="Bearer $token"} -Body ($body | convertto-json -depth 10) -ContentType "application/json"
 
 }

@@ -7,6 +7,8 @@
     Assign the Device.Read.All permissions to the managed identity by using: https://gitlab.com/Lieben/assortedFunctions/-/blob/master/add-roleToManagedIdentity.ps1
     In addition assign the cloud device administrator (Azure AD) role to the Managed Identity.
 
+    If you want the script to send mail reports, also assign a value for the From, To addresses and assign the Mail.Send graph permission to the managed identity as per above instructions.
+
     If the firstDisableDevices switch is also supplied, devices will not be deleted when the inactiveThresholdInDays is met, but disabled instead. Then after the 
     disableDurationInDays threshold, they will be deleted.
 
@@ -26,7 +28,9 @@ Param(
     [Switch]$removeInactiveDevices,
     [Switch]$firstDisableDevices,
     [Int]$disableDurationInDays = 30,
-    [Switch]$nonInteractive
+    [Switch]$nonInteractive,
+    [String]$mailFrom,
+    [String[]]$mailTo
 )
 
 [void] [System.Reflection.Assembly]::LoadWithPartialName("System.Web")
@@ -162,7 +166,46 @@ for($i=0; $i -lt $devices.Count; $i++){
     $reportData+=$obj
 }
 
+$reportData | Export-CSV -Path "deviceActivityReport.csv" -Encoding UTF8 -NoTypeInformation
+
 if(!$nonInteractive){
-    $reportData | Export-CSV -Path "deviceActivityReport.csv" -Encoding UTF8 -NoTypeInformation
     .\deviceActivityReport.csv
+}
+
+If($mailFrom -and $mailTo){
+    $body = @{
+        "message"=@{
+            "subject" = "device activity report"
+            "body" = @{
+                "contentType" = "HTML"
+                "content" = [String]"please find attached an automated device activity report"
+            }
+            "toRecipients" = @()
+            "from" = [PSCustomObject]@{
+                "emailAddress"= [PSCustomObject]@{
+                    "address"= $mailFrom
+                }
+            }
+            "attachments" = @()
+        };
+        "saveToSentItems"=$False
+    }
+
+    foreach($recipient in $mailTo){
+        $body.message.toRecipients += [PSCustomObject]@{"emailAddress" = [PSCustomObject]@{"address"=$recipient}} 
+    }
+
+    $attachment = Get-Item "deviceActivityReport.csv"
+
+    $FileName=(Get-Item -Path $attachment).name
+    $base64string = [Convert]::ToBase64String([IO.File]::ReadAllBytes($attachment))
+    $body.message.attachments += [PSCustomObject]@{
+        "@odata.type" = "#microsoft.graph.fileAttachment"
+        "name" = "deviceActivityReport.csv"
+        "contentType" = "text/plain"
+        "contentBytes" = "$base64string"
+    }
+
+    Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/users/$mailFrom/sendMail" -Method POST -Headers $graphHeaders -Body ($body | convertto-json -depth 10) -ContentType "application/json"
+
 }

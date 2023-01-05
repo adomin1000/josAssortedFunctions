@@ -3,7 +3,7 @@
     Automatically tag devices in Microsoft Defender Advanced Threat Protection based on the primary user attributes (company in the example). To be used in MDATP device groups for targetting (https://securitycenter.windows.com/preferences2/machine_groups)
     
     .REQUIREMENTS
-    An app registration (client ID) with graph\Device.Read, WindowsDefenderATP\Machine.ReadWrite scopes and a user account with sufficient permissions in MDATP
+    An app registration (client ID) with graph\Device.Read.All, WindowsDefenderATP\Machine.ReadWrite (delegated) scopes and a user account with sufficient permissions in MDATP
 
     .ASSUMPTIONS
     It is assumed you're running this from an Azure Runbook with a credential stored, if not you'll have to replace line 99 to prompt for a credential

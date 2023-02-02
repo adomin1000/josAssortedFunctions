@@ -16,7 +16,7 @@ $teamsDownloadUrl = "https://teams.microsoft.com/downloads/desktopurl?env=produc
 $redirectorDownloadUrl = "https://aka.ms/msrdcwebrtcsvc/msi"
 
 $workingDir = Join-Path $Env:TEMP -ChildPath "TeamsInstall" 
-if(!(Test-Path -Path $path)){
+if(!(Test-Path -Path $workingDir)){
   New-Item $workingDir -ItemType Directory -Force > $null
 }
 

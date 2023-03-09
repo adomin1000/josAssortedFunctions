@@ -137,9 +137,9 @@ try{
     }
 
     #disable built in admin account if specified
-    foreach($administrator in $administrators){
-        if($administrator.EndsWith("-500")){
-            if($disableBuiltinAdminAccount){
+    if($disableBuiltinAdminAccount){
+        foreach($administrator in $administrators){
+            if($administrator.EndsWith("-500")){
                 if((Get-LocalUser -SID $administrator).Enabled){
                     $res = Disable-LocalUser -SID $administrator -Confirm:$False
                     Write-CustomEventLog "Disabled $($administrator) because it is a built-in account and `$disableBuiltinAdminAccount is set to `$True"

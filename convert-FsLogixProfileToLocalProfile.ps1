@@ -37,11 +37,12 @@ try{
     }else{
         $profileRemotePath = (Get-ChildItem $filesharePath | where{$_.Name.EndsWith($user)}).FullName
     }
-    $profileRemotePath = (Get-ChildItem $profileRemotePath | where{$_.Name.StartsWith("Profile") -and $_.Name.EndsWith(".vhd")}).FullName
+    $profileRemotePath = (Get-ChildItem $profileRemotePath | where{$_.Name.StartsWith("Profile") -and ($_.Name.EndsWith(".vhd") -or $_.Name.EndsWith(".vhdx"))}).FullName
     if(!(Test-Path $profileRemotePath)){
         Throw "Failed to find a profile directory for $user in $filesharePath"
     }
     Write-Output "profile path $profileRemotePath detected"
+    $Extension = $profileRemotePath.Split(".")[-1]
 }catch{
     Write-Output $_
     Exit 1
@@ -53,12 +54,12 @@ if($profileRemotePath.Count -gt 1){
 }
 
 if($createBackupOfProfile){
-    Copy-Item $profileRemotePath $profileRemotePath.Replace(".vhd",".bck")
+    Copy-Item $profileRemotePath $profileRemotePath.Replace($Extension,"bck")
 }
 
 try{
     Write-Output "Mounting profile disk of $user"
-    $profileMountResult = Mount-DiskImage -ImagePath $profileRemotePath -StorageType VHD -Access ReadWrite
+    $profileMountResult = Mount-DiskImage -ImagePath $profileRemotePath -StorageType $Extension -Access ReadWrite
     Start-Sleep -Seconds 20
     $vol = Get-CimInstance -ClassName Win32_Volume | Where{$_.Label -and $_.Label.StartsWith("Profile")}
     if(!$vol.DriveLetter){
@@ -123,7 +124,7 @@ try{
 
 try{
     Write-Output "Dismounting remote profile disk"
-    Dismount-DiskImage -ImagePath $profileRemotePath -StorageType VHD -Confirm:$False
+    Dismount-DiskImage -ImagePath $profileRemotePath -StorageType $Extension -Confirm:$False
     Write-Output "Dismounted $profileRemotePath"
 }catch{
     Write-Output $_
